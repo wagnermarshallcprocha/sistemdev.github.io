@@ -407,6 +407,7 @@
     </ul>
     <div class="sidebar-footer">
         <button onclick="handleAuthClick()" class="sidebar-btn" style="background:#4285f4;"><i class="fab fa-google"></i> Conectar Google Sheets</button>
+        <button onclick="importFromSheets()" class="sidebar-btn" style="margin-top:0.5rem;background:#0f9d58;"><i class="fas fa-cloud-download-alt"></i> Importar da Planilha</button>
         <button id="downloadCSV" class="sidebar-btn" style="margin-top:0.5rem;"><i class="fas fa-download"></i> Baixar CSV Atualizado</button>
         <button id="logoutBtn" class="sidebar-btn" style="margin-top:0.5rem;"><i class="fas fa-sign-out-alt"></i> Sair</button>
     </div>
@@ -2286,7 +2287,9 @@
             if (resp.error !== undefined) {
                 throw (resp);
             }
-            await syncToGoogleSheets();
+            // Após autenticação bem-sucedida, importar dados da planilha
+            showNotification('success', 'Conectado ao Google Sheets! Importando dados...');
+            await fetchSheetData();
         };
 
         if (gapi.client.getToken() === null) {
@@ -2337,13 +2340,18 @@
                 ensureColumns();
                 filteredData = [...csvData];
                 renderAll();
-                showNotification('success', 'Dados carregados do Google Sheets!');
+                startMonitoring();
+                const numRegistros = csvData.length;
+                showNotification('success', `Dados importados com sucesso! ${numRegistros} registro(s) carregado(s) do Google Sheets.`);
                 // Salvar também no localStorage como backup
                 localStorage.setItem('csvData', JSON.stringify(csvData));
                 localStorage.setItem('csvHeaders', JSON.stringify(headers));
+            } else {
+                showNotification('info', 'Planilha do Google Sheets está vazia. Começando com dados locais.');
             }
         } catch (err) {
             console.error('Erro ao buscar dados:', err);
+            showNotification('error', 'Erro ao importar dados do Google Sheets. Usando dados locais.');
             throw err;
         }
     }
@@ -2382,6 +2390,28 @@
         } catch (err) {
             console.error('Erro ao sincronizar com Google Sheets:', err);
             // Não mostrar erro para não interromper o fluxo do usuário
+        }
+    }
+
+    async function importFromSheets() {
+        if (!gapiInited || !gisInited) {
+            showNotification('error', 'Google Sheets ainda não está inicializado.');
+            return;
+        }
+
+        try {
+            // Se não tiver token, solicita autenticação primeiro
+            if (gapi.client.getToken() === null) {
+                showNotification('info', 'Por favor, conecte-se ao Google Sheets primeiro.');
+                handleAuthClick();
+                return;
+            }
+
+            showNotification('info', 'Importando dados da planilha...');
+            await fetchSheetData();
+        } catch (err) {
+            console.error('Erro ao importar:', err);
+            showNotification('error', 'Erro ao importar dados da planilha.');
         }
     }
 
