@@ -1,0 +1,2899 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Devolução</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.2.0/dist/signature_pad.umd.min.js"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root{
+            --primary:#28a745; --accent:#218838; --danger:#dc3545; --text:#333; --bg:#f4f4f4; --card:#fff; --border:#ddd; --shadow:0 2px 5px rgba(0,0,0,0.1);
+            --overdue:#f8d7da; --alert-bg:#ffcdda; --alert-border:#ffa7a7;
+        }
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:'Roboto',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;padding-left:250px;}
+        .sidebar{position:fixed;left:0;top:0;bottom:0;width:250px;background:#2c3e50;color:white;display:flex;flex-direction:column;padding:1rem;box-shadow:var(--shadow);z-index:1000;}
+        .sidebar-nav{list-style:none;flex-grow:1;}
+        .sidebar-link{display:flex;align-items:center;color:white;text-decoration:none;padding:1rem;margin-bottom:0.5rem;border-radius:5px;transition:background 0.3s;}
+        .sidebar-link:hover{background:#34495e;}
+        .sidebar-link i{margin-right:0.75rem;font-size:1.2rem;}
+        .sidebar-footer{margin-top:auto;text-align:center;}
+        .sidebar-btn{background:var(--primary);color:white;border:none;padding:0.75rem 1rem;cursor:pointer;border-radius:5px;width:100%;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:background 0.3s;}
+        .sidebar-btn:hover{background:var(--accent);}
+        #logoutBtn{background:#dc3545 !important;}
+        #logoutBtn:hover{background:#c82333 !important;}
+        .header{background:var(--primary);color:white;padding:0.75rem;text-align:center;box-shadow:var(--shadow);position:relative;}
+        .header h1{font-size:1.5rem;}
+        .logout-btn{position:absolute;top:0.75rem;right:0.75rem;background:var(--danger);color:white;border:none;padding:0.4rem 0.8rem;cursor:pointer;border-radius:5px;font-size:0.9rem;}
+        .controls{background:#e9ecef;padding:0.75rem;text-align:center;margin-bottom:0.75rem;}
+        .controls button{background:var(--primary);color:white;border:none;padding:0.4rem 0.8rem;margin:0 0.3rem;cursor:pointer;border-radius:5px;font-size:0.9rem;transition:background 0.3s;}
+        .controls button:hover{background:var(--accent);}
+        .filter-bar{background:#f8f9fa;padding:0.75rem;text-align:center;margin-bottom:0.75rem;display:none;}
+        .filter-bar input{padding:0.4rem;margin-right:0.3rem;border:1px solid #ccc;border-radius:5px;font-size:0.9rem;}
+        .filter-bar button{background:var(--primary);color:white;border:none;padding:0.4rem 0.8rem;border-radius:5px;cursor:pointer;}
+        .alert-card{background:var(--alert-bg);border:1px solid var(--alert-border);padding:0.75rem;margin-bottom:0.75rem;border-radius:8px;box-shadow:var(--shadow);}
+        .alert-card h3{color:#ff000d;font-size:1.2rem;margin-bottom:0.5rem;}
+        #alertList{max-height:300px;overflow-y:auto;overflow-x:hidden;padding-right:5px;}
+        #alertList::-webkit-scrollbar{width:8px;}
+        #alertList::-webkit-scrollbar-track{background:#f1f1f1;border-radius:4px;}
+        #alertList::-webkit-scrollbar-thumb{background:#888;border-radius:4px;}
+        #alertList::-webkit-scrollbar-thumb:hover{background:#555;}
+        .alert-item{display:flex;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid #ddd;font-size:0.9rem;}
+        .alert-item .protocol{font-weight:bold;}
+        .alert-item .time{color:#741720;}
+        .main-panel{display:flex;flex-wrap:wrap;gap:1rem;margin:1rem 0;padding:0 0.75rem;justify-content:flex-start;}
+        .card{background:var(--card);padding:1rem;border-radius:8px;box-shadow:var(--shadow);min-width:250px;}
+        .card:first-child{flex:3 1 600px;}
+        .card:last-child{flex:1 1 300px;}
+        .card h2{font-size:1.2rem;margin-bottom:0.5rem;}
+        .table-container{overflow:auto;max-height:400px;border:1px solid var(--border);border-radius:5px;background:#fff;}
+        .table-container table{width:100%;border-collapse:separate;border-spacing:0;font-size:0.9rem;table-layout:auto;}
+        .table-container th,.table-container td{padding:0.5rem 0.75rem;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;min-width:120px;}
+        .table-container th{background:#f8f9fa;font-weight:bold;position:sticky;top:0;z-index:1;}
+        .table-container tr:hover{background:#f1f1f1;}
+        .table-container tr.overdue{background:var(--overdue);}
+        .chart-container select{margin-bottom:0.5rem;padding:0.4rem;border:1px solid #ccc;border-radius:5px;font-size:0.9rem;}
+        .chart-container canvas{max-width:100%;height:250px;}
+        .back-btn{position:absolute;top:1rem;left:1rem;color:white;text-decoration:none;display:flex;align-items:center;gap:0.5rem;}
+        .form-panel{max-width:600px;margin:2rem auto;background:var(--card);padding:2rem;border-radius:8px;box-shadow:var(--shadow);}
+        .notification{padding:1rem;margin-bottom:1rem;border-radius:5px;text-align:center;display:none;}
+        .notification.success{background:#d4edda;color:#155724;}
+        .notification.error{background:#f8d7da;color:#721c24;}
+        #formFields{display:grid;grid-template-columns:auto 1fr;gap:0.5rem;align-items:center;margin-bottom:1rem;}
+        #formFields label{grid-column:1;text-align:right;padding-right:0.5rem;font-weight:bold;}
+        #formFields input,#formFields select{grid-column:2;padding:0.75rem;border:1px solid #ccc;border-radius:5px;}
+        .submit-wrapper button{background:var(--primary);color:white;border:none;padding:0.75rem;cursor:pointer;border-radius:5px;font-size:1rem;transition:background 0.3s;}
+        .submit-wrapper button:hover{background:var(--accent);}
+        .btn-group{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;align-items:center;padding:8px;}
+        .btn-pdf{background:#e91e63;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;gap:6px;margin:2px;transition:all .2s;}
+        .btn-pdf:hover{background:#c2185b;}
+        .btn-etiqueta{background:#4caf50;color:white;}
+        .btn-etiqueta:hover{background:#388e3c;}
+        .btn-view-signed{background:#9c27b0;color:white;}
+        .btn-view-signed:hover{background:#7b1fa2;}
+        .status-badge{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;text-align:center;display:inline-block;min-width:110px;}
+        .status-Em-Andamento{background:#fff8e1;color:#e65100;border:2px solid #ffcc80;}
+        .status-Aguardando-Coleta{background:#e8f5e9;color:#2e7d32;border:2px solid #a5d6a7;}
+        .status-Coletado{background:#e3f2fd;color:#1565c0;border:2px solid #90caf9;}
+        .status-Cancelado{background:#ffebee;color:#c62828;border:2px solid #ef9a9a;}
+        .status-Desistido{background:#f5f5f5;color:#616161;border:2px solid #bdbdbd;}
+
+        .volumes-cell{background:#e8f5e9 !important;font-weight:bold;color:#2e7d32;}
+        td[contenteditable="true"]{background:#fffde6;outline:2px solid #4A90E2;cursor:text;min-width:80px;text-align:center;font-weight:600;}
+        td[contenteditable="true"]:focus{background:#f0f8ff;}
+        .modal{background:rgba(0,0,0,0.8);position:fixed;top:0;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;z-index:1000;padding:20px;}
+        .modal-content{background:var(--card);border-radius:12px;max-width:900px;width:100%;max-height:95vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,0.4);}
+        .modal-header{padding:20px;background:var(--primary);color:white;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;}
+        .close-modal{font-size:28px;cursor:pointer;}
+        .signature-section{padding:20px;}
+        .signature-title{text-align:center;font-weight:bold;margin:15px 0 5px;color:var(--primary);}
+        .signature-controls{text-align:center;margin-top:10px;}
+        .signature-controls button{margin:0 5px;padding:8px 16px;background:#ddd;border:none;border-radius:5px;cursor:pointer;}
+        .signature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:20px;}
+        .signature-box{border:1px solid var(--border);border-radius:8px;padding:15px;background:#f9f9f9;}
+        .signature-form{margin-bottom:10px;}
+        .signature-form input{width:100%;padding:8px;margin-top:5px;border:1px solid var(--border);border-radius:4px;font-size:14px;}
+        .signature-form input.invalid{border-color:var(--danger);background:#fff5f5;}
+        .signature-form .error-msg{color:var(--danger);font-size:12px;margin-top:3px;display:none;}
+        canvas{width:100%;height:150px;background:white;border:1px solid var(--border);border-radius:8px;}
+        @media (max-width:768px){
+            body{padding-left:0;}
+            .sidebar{width:100%;height:auto;position:relative;flex-direction:row;justify-content:space-around;padding:0.5rem;}
+            .main-panel{flex-direction:column;}
+            .card:first-child,.card:last-child{flex:1 1 100%;}
+            footer{left:0;}
+        }
+        .botao-abrir-rodape{padding:10px 12px;font-size:12px;background:#808080;color:white;border:none;border-radius:6px;cursor:pointer;transition:background .3s;}
+        .botao-abrir-rodape:hover{background:#353D39;}
+        .reports-container{max-width:1200px;margin:0 auto;padding:20px;}
+        .reports-header{text-align:center;margin-bottom:30px;}
+        .reports-section{background:var(--card);border-radius:8px;padding:20px;margin-bottom:20px;box-shadow:var(--shadow);}
+        .reports-section h3{color:var(--primary);margin-bottom:15px;border-bottom:2px solid var(--primary);padding-bottom:10px;}
+        .filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin-bottom:15px;}
+        .filter-item{display:flex;flex-direction:column;}
+        .filter-item label{font-weight:500;margin-bottom:5px;color:var(--text);}
+        .filter-item input,.filter-item select{padding:10px;border:1px solid var(--border);border-radius:5px;font-size:14px;}
+        .checkbox-group{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px;}
+        .checkbox-item{display:flex;align-items:center;gap:8px;}
+        .checkbox-item input[type="checkbox"]{width:18px;height:18px;cursor:pointer;}
+        .checkbox-item label{cursor:pointer;font-size:14px;}
+        .report-actions{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap;}
+        .report-btn{padding:12px 24px;border:none;border-radius:6px;cursor:pointer;font-size:15px;font-weight:500;transition:all 0.3s;display:flex;align-items:center;gap:8px;}
+        .report-btn i{font-size:16px;}
+        .report-btn.primary{background:var(--primary);color:white;}
+        .report-btn.primary:hover{background:var(--accent);}
+        .report-btn.secondary{background:#2196F3;color:white;}
+        .report-btn.secondary:hover{background:#1976D2;}
+        .report-btn.danger{background:var(--danger);color:white;}
+        .report-btn.danger:hover{background:#c82333;}
+        .report-btn.info{background:#17a2b8;color:white;}
+        .report-btn.info:hover{background:#138496;}
+        .preview-table{width:100%;border-collapse:collapse;margin-top:15px;font-size:13px;table-layout:auto;}
+        .preview-table th,.preview-table td{padding:10px;text-align:left;border:1px solid var(--border);white-space:nowrap;min-width:150px;}
+        .preview-table th{background:var(--primary);color:white;font-weight:500;}
+        .preview-table tr:nth-child(even){background:#f9f9f9;}
+        .preview-table tr:hover{background:#f0f8ff;}
+        .summary-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-top:15px;}
+        .stat-card{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px;border-radius:8px;text-align:center;}
+        .stat-card.green{background:linear-gradient(135deg,#28a745 0%,#218838 100%);}
+        .stat-card.blue{background:linear-gradient(135deg,#2196F3 0%,#1976D2 100%);}
+        .stat-card.orange{background:linear-gradient(135deg,#ff9800 0%,#f57c00 100%);}
+        .stat-card h4{margin:0;font-size:14px;opacity:0.9;}
+        .stat-card .value{font-size:28px;font-weight:bold;margin:10px 0;}
+        .table-scroll-container{overflow-x:auto;margin-top:20px;border:1px solid var(--border);border-radius:8px;background:white;}
+        .table-scroll-container::-webkit-scrollbar{height:12px;}
+        .table-scroll-container::-webkit-scrollbar-track{background:#f1f1f1;border-radius:8px;}
+        .table-scroll-container::-webkit-scrollbar-thumb{background:#888;border-radius:8px;}
+        .table-scroll-container::-webkit-scrollbar-thumb:hover{background:#555;}
+        footer{position:fixed;bottom:0;left:250px;right:0;background:white;border-top:3px solid var(--primary);box-shadow:0 -4px 15px rgba(0,0,0,0.15);z-index:999;padding:15px 20px;
+            transform:translateY(100%);transition:transform .4s ease;max-height:90vh;overflow-y:auto;}
+        footer.aberto{transform:translateY(0);}
+        .detail-content{max-width:1000px;margin:0 auto;position:relative;}
+        .detail-header{display:flex;justify-content:space-between;align-items:center;font-size:1.1rem;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #ddd;}
+        .close-detail{background:none;border:none;font-size:32px;font-weight:bold;cursor:pointer;color:#555;}
+        .close-detail:hover{color:#000;}
+        .detail-body{display:grid;grid-template-columns:repeat(4, 1fr);gap:15px;}
+        .detail-field{display:flex;flex-direction:column;gap:5px;}
+        .detail-field label{font-weight:bold;color:#333;font-size:14px;}
+        .detail-field input,.detail-field textarea,.detail-field select{width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:6px;font-size:15px;transition:background 0.3s;}
+        .full-width{grid-column:1/-1;}
+        .detail-actions{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px;}
+        .detail-actions button{padding:10px 18px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;}
+        #detailVolumes.saving, #detailObs.saving, #detailNfeDevInput.saving, #detailProtocolo.saving, #detailStatus.saving {background:#d4edda !important;}
+        @media (max-width:768px){.detail-body{grid-template-columns:1fr;}}
+        @media (min-width:769px) and (max-width:1200px){.detail-body{grid-template-columns:repeat(2, 1fr);}}
+        
+        /* LOGIN */
+        #loginScreen{position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;z-index:9999;}
+        .login-card{background:white;padding:2.5rem;border-radius:15px;box-shadow:0 10px 40px rgba(0,0,0,0.3);width:90%;max-width:400px;}
+        .login-card h1{text-align:center;color:#333;margin-bottom:0.5rem;font-size:1.8rem;}
+        .login-card p{text-align:center;color:#666;margin-bottom:2rem;font-size:0.9rem;}
+        .login-field{margin-bottom:1.5rem;}
+        .login-field label{display:block;margin-bottom:0.5rem;color:#333;font-weight:500;}
+        .login-field input,.login-field select{width:100%;padding:0.75rem;border:2px solid #ddd;border-radius:8px;font-size:1rem;transition:border 0.3s;}
+        .login-field input:focus,.login-field select:focus{outline:none;border-color:var(--primary);}
+        .login-btn{width:100%;padding:0.9rem;background:var(--primary);color:white;border:none;border-radius:8px;font-size:1.1rem;font-weight:600;cursor:pointer;transition:background 0.3s;}
+        .login-btn:hover{background:var(--accent);}
+        .login-error{background:#ffebee;color:#c62828;padding:0.75rem;border-radius:8px;margin-bottom:1rem;text-align:center;display:none;}
+        .user-info{background:#34495e;padding:0.75rem;border-radius:8px;margin-bottom:1rem;text-align:center;color:white;}
+        .user-info strong{display:block;font-size:1.1rem;margin-bottom:0.25rem;}
+        .user-info span{font-size:0.9rem;opacity:0.9;}
+        
+        /* GERENCIAMENTO DE USUÁRIOS */
+        .users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.5rem;margin-top:1.5rem;}
+        .user-card{background:white;padding:1.5rem;border-radius:10px;box-shadow:var(--shadow);border:2px solid #e0e0e0;transition:all 0.3s;}
+        .user-card:hover{box-shadow:0 4px 15px rgba(0,0,0,0.2);border-color:var(--primary);}
+        .user-card-header{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;padding-bottom:1rem;border-bottom:2px solid #f0f0f0;}
+        .user-icon{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));color:white;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:bold;}
+        .user-card-info h3{margin:0;font-size:1.1rem;color:#333;}
+        .user-card-info p{margin:0;font-size:0.85rem;color:#666;}
+        .user-card-body label{display:block;margin-bottom:0.5rem;font-weight:600;color:#555;font-size:0.9rem;}
+        .user-card-body input{width:100%;padding:0.6rem;border:2px solid #ddd;border-radius:6px;font-size:0.95rem;transition:border 0.3s;}
+        .user-card-body input:focus{outline:none;border-color:var(--primary);}
+        .user-card-actions{margin-top:1rem;display:flex;gap:0.5rem;}
+        .btn-save-user{flex:1;padding:0.7rem;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:600;cursor:pointer;transition:background 0.3s;}
+        .btn-save-user:hover{background:var(--accent);}
+        .btn-reset-user{flex:1;padding:0.7rem;background:#6c757d;color:white;border:none;border-radius:6px;font-weight:600;cursor:pointer;transition:background 0.3s;}
+        .btn-reset-user:hover{background:#5a6268;}
+        .success-msg{background:#d4edda;color:#155724;padding:0.5rem;border-radius:4px;margin-top:0.5rem;text-align:center;font-size:0.85rem;display:none;}
+        
+        /* HISTÓRICO DE ALTERAÇÕES */
+        .history-controls{display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center;}
+        .history-filter{padding:0.6rem;border:2px solid #ddd;border-radius:6px;font-size:0.95rem;min-width:150px;}
+        .btn-clear-history{padding:0.6rem 1.2rem;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;transition:background 0.3s;}
+        .btn-clear-history:hover{background:#c82333;}
+        .history-timeline{position:relative;padding-left:40px;margin-top:2rem;}
+        .history-timeline::before{content:'';position:absolute;left:15px;top:0;bottom:0;width:3px;background:linear-gradient(to bottom, var(--primary), var(--accent));}
+        .history-item{position:relative;background:white;padding:1.2rem;margin-bottom:1.5rem;border-radius:10px;box-shadow:var(--shadow);border-left:4px solid var(--primary);transition:all 0.3s;}
+        .history-item:hover{box-shadow:0 4px 15px rgba(0,0,0,0.2);transform:translateX(5px);}
+        .history-item::before{content:'';position:absolute;left:-28px;top:20px;width:12px;height:12px;border-radius:50%;background:var(--primary);border:3px solid white;box-shadow:0 0 0 3px var(--primary);}
+        .history-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;padding-bottom:0.8rem;border-bottom:2px solid #f0f0f0;}
+        .history-action{font-weight:bold;font-size:1.1rem;color:#333;}
+        .history-action.created{color:#28a745;}
+        .history-action.updated{color:#007bff;}
+        .history-action.deleted{color:#dc3545;}
+        .history-timestamp{font-size:0.85rem;color:#666;font-style:italic;}
+        .history-user{display:inline-flex;align-items:center;gap:0.5rem;background:#f8f9fa;padding:0.3rem 0.8rem;border-radius:15px;font-size:0.85rem;color:#495057;}
+        .history-user i{color:var(--primary);}
+        .history-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.8rem;font-size:0.9rem;}
+        .history-field{background:#f8f9fa;padding:0.6rem;border-radius:6px;}
+        .history-field strong{display:block;color:#666;font-size:0.8rem;margin-bottom:0.3rem;}
+        .history-field span{color:#333;font-weight:500;}
+        .history-change{display:flex;align-items:center;gap:0.5rem;}
+        .history-old{color:#dc3545;text-decoration:line-through;opacity:0.7;}
+        .history-new{color:#28a745;font-weight:600;}
+        .history-arrow{color:#999;}
+        .no-history{text-align:center;padding:3rem;color:#666;font-size:1.1rem;}
+        .no-history i{font-size:3rem;color:#ddd;margin-bottom:1rem;display:block;}
+        
+        /* MODAL DE MOTIVO DE CANCELAMENTO */
+        .cancel-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10000;align-items:center;justify-content:center;}
+        .cancel-modal.active{display:flex;}
+        .cancel-modal-content{background:white;padding:2rem;border-radius:12px;max-width:500px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);}
+        .cancel-modal-header{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:2px solid #f0f0f0;}
+        .cancel-modal-header i{font-size:2rem;color:#dc3545;}
+        .cancel-modal-header h3{margin:0;font-size:1.3rem;color:#333;}
+        .cancel-modal-body label{display:block;margin-bottom:0.5rem;font-weight:600;color:#555;}
+        .cancel-modal-body textarea{width:100%;padding:0.8rem;border:2px solid #ddd;border-radius:8px;font-size:0.95rem;resize:vertical;min-height:100px;font-family:'Roboto',sans-serif;}
+        .cancel-modal-body textarea:focus{outline:none;border-color:#dc3545;}
+        .cancel-modal-actions{display:flex;gap:1rem;margin-top:1.5rem;}
+        .cancel-modal-actions button{flex:1;padding:0.8rem;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:1rem;transition:all 0.3s;}
+        .btn-cancel-confirm{background:#dc3545;color:white;}
+        .btn-cancel-confirm:hover{background:#c82333;}
+        .btn-cancel-abort{background:#6c757d;color:white;}
+        .btn-cancel-abort:hover{background:#5a6268;}
+        
+        /* IMPORTAÇÃO DE CSV */
+        .import-container{max-width:900px;margin:0 auto;}
+        .upload-area{border:3px dashed #ddd;border-radius:12px;padding:3rem;text-align:center;background:#f8f9fa;transition:all 0.3s;cursor:pointer;margin-bottom:2rem;}
+        .upload-area:hover{border-color:var(--primary);background:#e8f5e9;}
+        .upload-area.drag-over{border-color:var(--primary);background:#c8e6c9;transform:scale(1.02);}
+        .upload-area i{font-size:4rem;color:#ddd;margin-bottom:1rem;}
+        .upload-area h3{color:#333;margin-bottom:0.5rem;}
+        .upload-area p{color:#666;font-size:0.9rem;}
+        .upload-area input[type="file"]{display:none;}
+        .import-options{display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem;margin-bottom:2rem;}
+        .import-option{background:white;padding:1.5rem;border-radius:10px;border:2px solid #e0e0e0;cursor:pointer;transition:all 0.3s;}
+        .import-option:hover{border-color:var(--primary);box-shadow:var(--shadow);}
+        .import-option.selected{border-color:var(--primary);background:#e8f5e9;}
+        .import-option input[type="radio"]{margin-right:0.75rem;transform:scale(1.3);}
+        .import-option h4{margin:0.5rem 0;color:#333;}
+        .import-option p{margin:0;font-size:0.85rem;color:#666;}
+        .preview-container{background:white;padding:1.5rem;border-radius:10px;margin-bottom:1.5rem;display:none;}
+        .preview-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;padding-bottom:1rem;border-bottom:2px solid #f0f0f0;}
+        .preview-stats{display:flex;gap:2rem;}
+        .preview-stat{text-align:center;}
+        .preview-stat .number{font-size:1.8rem;font-weight:bold;color:var(--primary);}
+        .preview-stat .label{font-size:0.85rem;color:#666;}
+        .preview-table{max-height:400px;overflow:auto;border:1px solid #ddd;border-radius:8px;}
+        .preview-table table{width:100%;border-collapse:collapse;table-layout:auto;}
+        .preview-table th{background:#f8f9fa;position:sticky;top:0;z-index:1;padding:0.75rem;text-align:left;font-size:0.85rem;border-bottom:2px solid #ddd;white-space:nowrap;min-width:150px;}
+        .preview-table td{padding:0.5rem 0.75rem;border-bottom:1px solid #f0f0f0;font-size:0.85rem;white-space:nowrap;min-width:150px;}
+        .import-actions{display:flex;gap:1rem;justify-content:center;}
+        .btn-import{padding:1rem 2.5rem;background:var(--primary);color:white;border:none;border-radius:8px;font-size:1.1rem;font-weight:600;cursor:pointer;transition:all 0.3s;}
+        .btn-import:hover{background:var(--accent);transform:translateY(-2px);}
+        .btn-import:disabled{background:#ccc;cursor:not-allowed;transform:none;}
+        .btn-cancel-import{padding:1rem 2.5rem;background:#6c757d;color:white;border:none;border-radius:8px;font-size:1.1rem;font-weight:600;cursor:pointer;transition:all 0.3s;}
+        .btn-cancel-import:hover{background:#5a6268;}
+        .import-info{background:#e3f2fd;border-left:4px solid #2196f3;padding:1rem;border-radius:8px;margin-bottom:1.5rem;}
+        .import-info h4{margin:0 0 0.5rem 0;color:#1976d2;}
+        .import-info ul{margin:0.5rem 0 0 1.5rem;color:#555;}
+    </style>
+</head>
+<body>
+
+<!-- TELA DE LOGIN -->
+<div id="loginScreen">
+    <div class="login-card">
+        <h1><i class="fas fa-box"></i> Sistema de Devolução</h1>
+        <p>Faça login para acessar o sistema</p>
+        <div id="loginError" class="login-error"></div>
+        <form id="loginForm">
+            <div class="login-field">
+                <label>Tipo de Acesso:</label>
+                <select id="loginType" required>
+                    <option value="">Selecione...</option>
+                    <option value="admin">Administrador</option>
+                    <option value="loja">Loja</option>
+                </select>
+            </div>
+            <div class="login-field" id="lojaField" style="display:none;">
+                <label>Número da Loja:</label>
+                <select id="lojaNumber">
+                    <option value="">Selecione a loja...</option>
+                </select>
+            </div>
+            <div class="login-field">
+                <label>Senha:</label>
+                <input type="password" id="loginPassword" required placeholder="Digite a senha">
+            </div>
+            <button type="submit" class="login-btn">Entrar</button>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL DE MOTIVO DE CANCELAMENTO -->
+<div id="cancelModal" class="cancel-modal">
+    <div class="cancel-modal-content">
+        <div class="cancel-modal-header">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3 id="cancelModalTitle">Motivo do Cancelamento</h3>
+        </div>
+        <div class="cancel-modal-body">
+            <label>Descreva o motivo: <small style="color:#999;">(obrigatório)</small></label>
+            <textarea id="cancelReason" placeholder="Digite o motivo do cancelamento ou desistência...&#10;&#10;Dica: Pressione Ctrl+Enter para confirmar rapidamente"></textarea>
+        </div>
+        <div class="cancel-modal-actions">
+            <button class="btn-cancel-abort" onclick="closeCancelModal()">
+                <i class="fas fa-times"></i> Cancelar (Esc)
+            </button>
+            <button class="btn-cancel-confirm" onclick="confirmCancellation()">
+                <i class="fas fa-check"></i> Confirmar (Ctrl+Enter)
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- RODAPÉ DETALHES (COM SALVAMENTO AUTOMÁTICO) -->
+<footer id="rodape">
+    <div class="detail-content">
+        <div class="detail-header">
+            <div><strong>Detalhes da Devolução:</strong> <span id="detailNfeDev"></span></div>
+            <button class="close-detail" onclick="closeDetailFooter()">×</button>
+        </div>
+        <div class="detail-body">
+            <div class="detail-field">
+                <label>Status:</label>
+                <select id="detailStatus">
+                    <option value="Em Andamento">Em Andamento</option>
+                    <option value="Aguardando Coleta">Aguardando Coleta</option>
+                    <option value="Coletado">Coletado</option>
+                    <option value="Cancelado">Cancelado</option>
+                    <option value="Desistido">Desistido</option>
+                </select>
+            </div>
+            <div class="detail-field">
+                <label>Protocolo:</label>
+                <input type="text" id="detailProtocolo" placeholder="Número do Protocolo">
+            </div>
+            <div class="detail-field">
+                <label>NFe Devolução:</label>
+                <input type="text" id="detailNfeDevInput" placeholder="Número da NFe de Devolução">
+            </div>
+            <div class="detail-field">
+                <label>Volumes:</label>
+                <input type="number" id="detailVolumes" min="1" max="99" value="1">
+            </div>
+            <div class="detail-field full-width" id="cancelReasonField" style="display:none;">
+                <label>Motivo do Cancelamento/Desistência:</label>
+                <textarea id="detailCancelReason" rows="3" readonly style="background:#f8f9fa;cursor:not-allowed;"></textarea>
+            </div>
+            <div class="detail-field full-width">
+                <label>Observações:</label>
+                <textarea id="detailObs" rows="4" placeholder="Digite observações adicionais..."></textarea>
+            </div>
+            <div class="detail-actions">
+                <button class="btn-etiqueta" onclick="if(currentRowIndex!==null) generateEtiquetaPDF(currentRowIndex)">Etiqueta(s)</button>
+                <button class="btn-pdf" onclick="if(currentRowIndex!==null) openSignatureModal(currentRowIndex)">Espelho / Assinatura</button>
+                <button class="btn-view-signed" onclick="if(currentRowIndex!==null) viewSignedPDF(csvData[currentRowIndex][NFE_DEV_COLUMN])">Visualizar Assinado</button>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<aside class="sidebar">
+    <div id="userInfo" class="user-info" style="display:none;">
+        <strong id="userName"></strong>
+        <span id="userRole"></span>
+    </div>
+    <ul class="sidebar-nav">
+        <li><a onclick="showRegistrar()" class="sidebar-link"><i class="fas fa-plus-circle"></i> Registrar Devolução</a></li>
+        <li><a onclick="goToAlerts()" class="sidebar-link"><i class="fas fa-bell"></i> Alertas</a></li>
+        <li><a onclick="goToChart()" class="sidebar-link"><i class="fas fa-chart-pie"></i> Gráficos</a></li>
+        <li id="adminMenuLink" style="display:none;"><a onclick="showUserManagement()" class="sidebar-link"><i class="fas fa-users-cog"></i> Gerenciar Usuários</a></li>
+        <li id="historyMenuLink" style="display:none;"><a onclick="showHistory()" class="sidebar-link"><i class="fas fa-history"></i> Histórico de Alterações</a></li>
+        <li id="reportsMenuLink" style="display:none;"><a onclick="showReports()" class="sidebar-link"><i class="fas fa-chart-bar"></i> Relatórios Personalizados</a></li>
+        <li id="importMenuLink" style="display:none;"><a onclick="showImport()" class="sidebar-link"><i class="fas fa-file-upload"></i> Importar CSV</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <button onclick="handleAuthClick()" class="sidebar-btn" style="background:#4285f4;"><i class="fab fa-google"></i> Conectar Google Sheets</button>
+        <button id="downloadCSV" class="sidebar-btn" style="margin-top:0.5rem;"><i class="fas fa-download"></i> Baixar CSV Atualizado</button>
+        <button id="logoutBtn" class="sidebar-btn" style="margin-top:0.5rem;"><i class="fas fa-sign-out-alt"></i> Sair</button>
+    </div>
+</aside>
+
+<div id="dashboard-page">
+    <header class="header">
+        <h1>Dashboard de Devoluções</h1>
+        <button class="logout-btn" onclick="clearData()">Limpar Dados</button>
+    </header>
+    <div class="controls">
+        <input type="file" id="fileInput" accept=".csv">
+        <button onclick="loadCSV()">Carregar Planilha</button>
+        <button onclick="clearData()">Limpar Dados</button>
+    </div>
+    <div class="filter-bar" id="filterContainer" style="display:none;">
+        <label>Buscar: <input type="text" id="filterInput" placeholder="Digite para filtrar..."></label>
+        <button onclick="clearFilters()">Limpar Filtro</button>
+    </div>
+    <div id="alertSection" style="display:none;">
+        <div class="alert-card">
+            <h3>Protocolo de Devoluções Pendentes</h3>
+            <div id="alertList"></div>
+        </div>
+    </div>
+    <div class="main-panel">
+        <div class="card">
+            <h2>Listagem de Devoluções</h2>
+            <div class="table-container" id="tableContainer"></div>
+        </div>
+        <div class="card chart-container" id="chartContainer" style="display:none;">
+            <h2>Gráfico Interativo</h2>
+            <select id="chartColumn"></select>
+            <canvas id="pieChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div id="registrar-page" style="display:none;">
+    <header class="header">
+        <h1>Registrar Nova Devolução</h1>
+        <a onclick="showDashboard()" class="back-btn"><i class="fas fa-arrow-left"></i> Voltar ao Dashboard</a>
+    </header>
+    <div class="form-panel">
+        <form id="addForm">
+            <div id="formFields"></div>
+            <div id="notification" class="notification" style="display:none;"></div>
+            <div class="submit-wrapper">
+                <button type="submit"><i class="fas fa-plus"></i> Registrar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="user-management-page" style="display:none;">
+    <header class="header">
+        <h1><i class="fas fa-users-cog"></i> Gerenciar Usuários</h1>
+        <a onclick="showDashboard()" class="back-btn"><i class="fas fa-arrow-left"></i> Voltar ao Dashboard</a>
+    </header>
+    <div class="form-panel">
+        <div id="usersContainer" class="users-grid"></div>
+    </div>
+</div>
+
+<div id="history-page" style="display:none;">
+    <header class="header">
+        <h1><i class="fas fa-history"></i> Histórico de Alterações</h1>
+        <a onclick="showDashboard()" class="back-btn"><i class="fas fa-arrow-left"></i> Voltar ao Dashboard</a>
+    </header>
+    <div class="form-panel">
+        <div class="history-controls">
+            <select id="historyActionFilter" class="history-filter">
+                <option value="">Todas as Ações</option>
+                <option value="created">Criações</option>
+                <option value="updated">Atualizações</option>
+                <option value="deleted">Exclusões</option>
+            </select>
+            <select id="historyUserFilter" class="history-filter">
+                <option value="">Todos os Usuários</option>
+            </select>
+            <input type="date" id="historyDateFilter" class="history-filter" placeholder="Filtrar por data">
+            <button class="btn-clear-history" onclick="clearHistory()">
+                <i class="fas fa-trash"></i> Limpar Histórico
+            </button>
+        </div>
+        <div id="historyContainer" class="history-timeline"></div>
+    </div>
+</div>
+
+<div id="import-page" style="display:none;">
+    <header class="header">
+        <h1><i class="fas fa-file-upload"></i> Importar CSV</h1>
+        <a onclick="showDashboard()" class="back-btn"><i class="fas fa-arrow-left"></i> Voltar ao Dashboard</a>
+    </header>
+    <div class="form-panel">
+        <div class="import-container">
+            <div class="import-info">
+                <h4><i class="fas fa-info-circle"></i> Como importar:</h4>
+                <ul>
+                    <li>Arraste e solte o arquivo CSV ou clique para selecionar</li>
+                    <li>O arquivo deve estar codificado em UTF-8</li>
+                    <li>A primeira linha deve conter os nomes das colunas</li>
+                    <li>Escolha entre mesclar com dados existentes ou substituí-los</li>
+                </ul>
+            </div>
+
+            <div class="upload-area" id="uploadArea">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h3>Arraste o arquivo CSV aqui</h3>
+                <p>ou clique para selecionar um arquivo</p>
+                <input type="file" id="csvFileInput" accept=".csv">
+            </div>
+
+            <div class="import-options">
+                <div class="import-option selected" onclick="selectImportMode('merge')">
+                    <input type="radio" name="importMode" value="merge" checked>
+                    <h4>Mesclar Dados</h4>
+                    <p>Adiciona novos registros aos existentes sem apagar nada</p>
+                </div>
+                <div class="import-option" onclick="selectImportMode('replace')">
+                    <input type="radio" name="importMode" value="replace">
+                    <h4>Substituir Dados</h4>
+                    <p>Remove todos os dados existentes e importa apenas os novos</p>
+                </div>
+            </div>
+
+            <div id="previewContainer" class="preview-container">
+                <div class="preview-header">
+                    <h3>Preview dos Dados</h3>
+                    <div class="preview-stats">
+                        <div class="preview-stat">
+                            <div class="number" id="previewRows">0</div>
+                            <div class="label">Registros</div>
+                        </div>
+                        <div class="preview-stat">
+                            <div class="number" id="previewColumns">0</div>
+                            <div class="label">Colunas</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="preview-table" id="previewTable"></div>
+                <div class="import-actions">
+                    <button class="btn-cancel-import" onclick="cancelImport()">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                    <button class="btn-import" id="btnConfirmImport" onclick="confirmImport()">
+                        <i class="fas fa-check"></i> Confirmar Importação
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<canvas id="barcodeCanvas" style="display:none;"></canvas>
+
+<div id="reports-page" style="display:none;">
+    <header class="header">
+        <h1><i class="fas fa-chart-bar"></i> Relatórios Personalizados</h1>
+        <a onclick="showDashboard()" class="back-btn"><i class="fas fa-arrow-left"></i> Voltar ao Dashboard</a>
+    </header>
+    
+    <div class="reports-container">
+        <div class="reports-section">
+            <h3><i class="fas fa-filter"></i> Filtros de Período</h3>
+            <div class="filter-grid">
+                <div class="filter-item">
+                    <label>Data Inicial:</label>
+                    <input type="date" id="reportStartDate">
+                </div>
+                <div class="filter-item">
+                    <label>Data Final:</label>
+                    <input type="date" id="reportEndDate">
+                </div>
+                <div class="filter-item">
+                    <label>Período Pré-definido:</label>
+                    <select id="reportPeriod" onchange="applyPredefinedPeriod()">
+                        <option value="">Personalizado</option>
+                        <option value="today">Hoje</option>
+                        <option value="week">Esta Semana</option>
+                        <option value="month">Este Mês</option>
+                        <option value="quarter">Este Trimestre</option>
+                        <option value="year">Este Ano</option>
+                        <option value="last30">Últimos 30 dias</option>
+                        <option value="last90">Últimos 90 dias</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="reports-section">
+            <h3><i class="fas fa-sliders-h"></i> Filtros Avançados</h3>
+            <div class="filter-grid">
+                <div class="filter-item">
+                    <label>Status:</label>
+                    <select id="reportStatus" multiple size="3">
+                        <option value="">Todos</option>
+                        <option value="Em Andamento">Em Andamento</option>
+                        <option value="Coletado">Coletado</option>
+                        <option value="Finalizado">Finalizado</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Unidade de Negócio:</label>
+                    <select id="reportLoja">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Motivo:</label>
+                    <select id="reportMotivo">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Cliente/Fornecedor:</label>
+                    <input type="text" id="reportCliente" placeholder="Filtrar por nome">
+                </div>
+            </div>
+        </div>
+
+        <div class="reports-section">
+            <h3><i class="fas fa-columns"></i> Campos para Incluir</h3>
+            <div style="margin-bottom:10px;">
+                <button class="report-btn secondary" onclick="selectAllFields()">
+                    <i class="fas fa-check-square"></i> Selecionar Todos
+                </button>
+                <button class="report-btn secondary" onclick="deselectAllFields()">
+                    <i class="fas fa-square"></i> Desmarcar Todos
+                </button>
+            </div>
+            <div class="checkbox-group" id="reportFieldsContainer"></div>
+        </div>
+
+        <div class="reports-section">
+            <h3><i class="fas fa-cog"></i> Opções do Relatório</h3>
+            <div class="filter-grid">
+                <div class="filter-item">
+                    <label>Agrupar Por:</label>
+                    <select id="reportGroupBy">
+                        <option value="">Sem agrupamento</option>
+                        <option value="status">Status</option>
+                        <option value="loja">Unidade de Negócio</option>
+                        <option value="motivo">Motivo</option>
+                        <option value="data">Data (Dia)</option>
+                        <option value="mes">Mês</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Ordenar Por:</label>
+                    <select id="reportSortBy">
+                        <option value="timestamp-desc">Data/Hora (Mais recente)</option>
+                        <option value="timestamp-asc">Data/Hora (Mais antigo)</option>
+                        <option value="nfe-asc">NFe Dev (Crescente)</option>
+                        <option value="nfe-desc">NFe Dev (Decrescente)</option>
+                        <option value="status">Status</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label>Formato de Exportação:</label>
+                    <select id="reportFormat">
+                        <option value="csv">CSV</option>
+                        <option value="excel">Excel (XLSX)</option>
+                        <option value="pdf">PDF</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="report-actions">
+            <button class="report-btn primary" onclick="generateReport()">
+                <i class="fas fa-search"></i> Gerar Prévia
+            </button>
+            <button class="report-btn info" onclick="exportReport()">
+                <i class="fas fa-download"></i> Exportar Relatório
+            </button>
+            <button class="report-btn secondary" onclick="saveReportTemplate()">
+                <i class="fas fa-save"></i> Salvar Template
+            </button>
+            <button class="report-btn danger" onclick="clearReportFilters()">
+                <i class="fas fa-eraser"></i> Limpar Filtros
+            </button>
+        </div>
+
+        <div id="reportPreviewSection" class="reports-section" style="display:none;">
+            <h3><i class="fas fa-eye"></i> Prévia do Relatório</h3>
+            <div class="summary-stats" id="reportSummary"></div>
+            <div class="table-scroll-container">
+                <table class="preview-table" id="reportPreviewTable"></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="signatureModal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Assinatura do Espelho - <span id="modalNfeDev"></span></h2>
+            <span class="close-modal" onclick="closeSignatureModal()">×</span>
+        </div>
+        <div class="signature-section">
+            <div class="signature-grid">
+                <div class="signature-box">
+                    <div class="signature-title">Cliente / Responsável</div>
+                    <div class="signature-form">
+                        <input type="text" id="nomeCliente" placeholder="Nome completo" required>
+                        <input type="text" id="cpfCliente" placeholder="CPF (apenas números)" maxlength="11" required>
+                        <div class="error-msg" id="errorCliente">CPF inválido</div>
+                    </div>
+                    <canvas id="sigCliente"></canvas>
+                    <div class="signature-controls"><button type="button" onclick="clearSignature('sigCliente')">Limpar</button></div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-title">Conferente</div>
+                    <div class="signature-form">
+                        <input type="text" id="nomeConferente" placeholder="Nome completo" required>
+                        <input type="text" id="cpfConferente" placeholder="CPF (apenas números)" maxlength="11" required>
+                        <div class="error-msg" id="errorConferente">CPF inválido</div>
+                    </div>
+                    <canvas id="sigConferente"></canvas>
+                    <div class="signature-controls"><button type="button" onclick="clearSignature('sigConferente')">Limpar</button></div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-title">Motorista / Entregador</div>
+                    <div class="signature-form">
+                        <input type="text" id="nomeMotorista" placeholder="Nome completo" required>
+                        <input type="text" id="cpfMotorista" placeholder="CPF (apenas números)" maxlength="11" required>
+                        <div class="error-msg" id="errorMotorista">CPF inválido</div>
+                    </div>
+                    <canvas id="sigMotorista"></canvas>
+                    <div class="signature-controls"><button type="button" onclick="clearSignature('sigMotorista')">Limpar</button></div>
+                </div>
+            </div>
+            <div style="text-align:center;margin-top:30px;">
+                <button style="padding:12px 30px;font-size:16px;background:#4CAF50;color:white;border:none;border-radius:8px;cursor:pointer;" onclick="saveSignedPDF(true)">Salvar e Visualizar</button>
+                <button style="padding:12px 20px;margin-left:10px;background:#2196F3;color:white;border:none;border-radius:8px;cursor:pointer;" onclick="saveSignedPDF(false)">Salvar Apenas</button>
+                <button style="padding:12px 20px;margin-left:10px;background:#999;color:white;border:none;border-radius:8px;cursor:pointer;" onclick="closeSignatureModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let csvData = [], headers = [], filteredData = [], chartFilter = null, chart;
+    let currentRowIndex = null;
+    let signaturePads = {};
+    let lastGeneratedPDFBlob = null;
+    let currentUser = null; // {type: 'admin' ou 'loja', loja: '1-16' (se tipo loja)}
+    let changeHistory = []; // Histórico de alterações
+    let pendingStatusChange = null; // Para armazenar mudança de status pendente
+    let pendingImportData = null; // Dados prontos para importar
+    let importMode = 'merge'; // 'merge' ou 'replace'
+
+    const TIMESTAMP_COLUMN = "Data de Inclusão";
+    const NFE_DEV_COLUMN = "NFe-Dev";
+    const STATUS_COLUMN = "Status";
+    const VOLUMES_COLUMN = "Volumes";
+    const STATUS_OPTIONS = ["Em Andamento", "Aguardando Coleta", "Coletado", "Cancelado", "Desistido"];
+    const LOJAS = Array.from({length: 16}, (_, i) => String(i + 1));
+    const MOTIVOS = ["Sem Pedido", "Div. Custo", "Erro Faturamento", "Produto Faltante", "Produto Avariado", "Validade Próxima", "Vencido", "Consignado - Não Vende"];
+
+    // === GOOGLE SHEETS CONFIGURATION ===
+    const GOOGLE_CONFIG = {
+        API_KEY: 'AIzaSyBNl3WH2XDrtI7VrINuFmu94g2i8RHE75I',
+        CLIENT_ID: '980344147538-3toc58dfml513v6gsolg32p27f9aaj70.apps.googleusercontent.com',
+        SPREADSHEET_ID: '1nse9nttIRDja80N7F93JXff2qRbViMcx2Dij8J_5WxI',
+        SHEET_NAME: 'Devolucoes',
+        DISCOVERY_DOCS: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
+        SCOPES: 'https://www.googleapis.com/auth/spreadsheets'
+    };
+
+    let gapiInited = false;
+    let gisInited = false;
+    let tokenClient;
+
+    // === AUTENTICAÇÃO ===
+    const USERS = {
+        admin: {password: 'admin123', type: 'admin', name: 'Administrador'},
+        loja1: {password: 'loja1', type: 'loja', loja: '1', name: 'Loja 1'},
+        loja2: {password: 'loja2', type: 'loja', loja: '2', name: 'Loja 2'},
+        loja3: {password: 'loja3', type: 'loja', loja: '3', name: 'Loja 3'},
+        loja4: {password: 'loja4', type: 'loja', loja: '4', name: 'Loja 4'},
+        loja5: {password: 'loja5', type: 'loja', loja: '5', name: 'Loja 5'},
+        loja6: {password: 'loja6', type: 'loja', loja: '6', name: 'Loja 6'},
+        loja7: {password: 'loja7', type: 'loja', loja: '7', name: 'Loja 7'},
+        loja8: {password: 'loja8', type: 'loja', loja: '8', name: 'Loja 8'},
+        loja9: {password: 'loja9', type: 'loja', loja: '9', name: 'Loja 9'},
+        loja10: {password: 'loja10', type: 'loja', loja: '10', name: 'Loja 10'},
+        loja11: {password: 'loja11', type: 'loja', loja: '11', name: 'Loja 11'},
+        loja12: {password: 'loja12', type: 'loja', loja: '12', name: 'Loja 12'},
+        loja13: {password: 'loja13', type: 'loja', loja: '13', name: 'Loja 13'},
+        loja14: {password: 'loja14', type: 'loja', loja: '14', name: 'Loja 14'},
+        loja15: {password: 'loja15', type: 'loja', loja: '15', name: 'Loja 15'},
+        loja16: {password: 'loja16', type: 'loja', loja: '16', name: 'Loja 16'}
+    };
+
+    function initLogin() {
+        // Carregar senhas personalizadas
+        loadUsers();
+        
+        // Preencher select de lojas
+        const lojaSelect = document.getElementById('lojaNumber');
+        LOJAS.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n;
+            opt.textContent = `Loja ${n}`;
+            lojaSelect.appendChild(opt);
+        });
+
+        // Mostrar/ocultar campo de loja
+        document.getElementById('loginType').addEventListener('change', function() {
+            document.getElementById('lojaField').style.display = this.value === 'loja' ? 'block' : 'none';
+        });
+
+        // Submit do login
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const type = document.getElementById('loginType').value;
+            const password = document.getElementById('loginPassword').value;
+            const lojaNum = document.getElementById('lojaNumber').value;
+
+            let username = type === 'admin' ? 'admin' : `loja${lojaNum}`;
+            
+            if (type === 'loja' && !lojaNum) {
+                showLoginError('Selecione uma loja.');
+                return;
+            }
+
+            const user = USERS[username];
+            if (!user || user.password !== password) {
+                showLoginError('Senha incorreta.');
+                return;
+            }
+
+            // Login bem-sucedido
+            currentUser = {type: user.type, loja: user.loja, name: user.name};
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userRole').textContent = user.type === 'admin' ? 'Acesso Total' : `Loja ${user.loja}`;
+            document.getElementById('userInfo').style.display = 'block';
+            
+            loadApp();
+        });
+
+        // Botão de logout
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+    }
+
+    function showLoginError(msg) {
+        const errorDiv = document.getElementById('loginError');
+        errorDiv.textContent = msg;
+        errorDiv.style.display = 'block';
+        setTimeout(() => errorDiv.style.display = 'none', 3000);
+    }
+
+    function logout() {
+        localStorage.removeItem('currentUser');
+        currentUser = null;
+        location.reload();
+    }
+
+    function checkAuth() {
+        const saved = localStorage.getItem('currentUser');
+        if (saved) {
+            currentUser = JSON.parse(saved);
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('userName').textContent = currentUser.name;
+            document.getElementById('userRole').textContent = currentUser.type === 'admin' ? 'Acesso Total' : `Loja ${currentUser.loja}`;
+            document.getElementById('userInfo').style.display = 'block';
+            
+            // Mostrar menus de admin se for admin
+            if (currentUser.type === 'admin') {
+                document.getElementById('adminMenuLink').style.display = 'block';
+                document.getElementById('historyMenuLink').style.display = 'block';
+                document.getElementById('reportsMenuLink').style.display = 'block';
+            }
+            
+            return true;
+        }
+        return false;
+    }
+
+    function getLojaColumn() {
+        return headers.find(h => /loja/i.test(h)) || headers[0];
+    }
+
+    function filterByUserPermission(data) {
+        if (!currentUser || currentUser.type === 'admin') {
+            return data;
+        }
+        // Filtrar apenas dados da loja do usuário
+        const lojaCol = getLojaColumn();
+        return data.filter(row => String(row[lojaCol]) === String(currentUser.loja));
+    }
+
+    // === GERENCIAMENTO DE USUÁRIOS ===
+    function loadUsers() {
+        const saved = localStorage.getItem('systemUsers');
+        if (saved) {
+            const savedUsers = JSON.parse(saved);
+            // Mesclar com usuários padrão
+            Object.keys(savedUsers).forEach(key => {
+                if (USERS[key]) {
+                    USERS[key].password = savedUsers[key].password;
+                }
+            });
+        }
+    }
+
+    function saveUsers() {
+        const usersToSave = {};
+        Object.keys(USERS).forEach(key => {
+            usersToSave[key] = {password: USERS[key].password};
+        });
+        localStorage.setItem('systemUsers', JSON.stringify(usersToSave));
+    }
+
+    function renderUserManagement() {
+        const container = document.getElementById('usersContainer');
+        let html = '';
+
+        // Admin
+        html += createUserCard('admin', USERS.admin);
+
+        // Lojas
+        for (let i = 1; i <= 16; i++) {
+            const key = `loja${i}`;
+            html += createUserCard(key, USERS[key]);
+        }
+
+        container.innerHTML = html;
+
+        // Adicionar eventos
+        Object.keys(USERS).forEach(key => {
+            document.getElementById(`save-${key}`).addEventListener('click', () => saveUserPassword(key));
+            document.getElementById(`reset-${key}`).addEventListener('click', () => resetUserPassword(key));
+        });
+    }
+
+    function createUserCard(key, user) {
+        const isAdmin = key === 'admin';
+        const icon = isAdmin ? 'A' : user.loja;
+        const bgColor = isAdmin ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'linear-gradient(135deg, var(--primary), var(--accent))';
+        
+        return `
+            <div class="user-card">
+                <div class="user-card-header">
+                    <div class="user-icon" style="background:${bgColor};">${icon}</div>
+                    <div class="user-card-info">
+                        <h3>${user.name}</h3>
+                        <p>${isAdmin ? 'Administrador do Sistema' : 'Acesso restrito à loja'}</p>
+                    </div>
+                </div>
+                <div class="user-card-body">
+                    <label>Nova Senha:</label>
+                    <input type="password" id="pwd-${key}" placeholder="Digite a nova senha">
+                    <div class="user-card-actions">
+                        <button class="btn-save-user" id="save-${key}">
+                            <i class="fas fa-save"></i> Salvar
+                        </button>
+                        <button class="btn-reset-user" id="reset-${key}">
+                            <i class="fas fa-undo"></i> Padrão
+                        </button>
+                    </div>
+                    <div class="success-msg" id="msg-${key}">✓ Senha atualizada!</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function saveUserPassword(key) {
+        const input = document.getElementById(`pwd-${key}`);
+        const newPassword = input.value.trim();
+
+        if (!newPassword) {
+            alert('Digite uma senha válida.');
+            return;
+        }
+
+        if (newPassword.length < 4) {
+            alert('A senha deve ter pelo menos 4 caracteres.');
+            return;
+        }
+
+        USERS[key].password = newPassword;
+        saveUsers();
+
+        // Mostrar mensagem de sucesso
+        const msg = document.getElementById(`msg-${key}`);
+        msg.style.display = 'block';
+        setTimeout(() => msg.style.display = 'none', 3000);
+
+        // Limpar campo
+        input.value = '';
+    }
+
+    function resetUserPassword(key) {
+        if (!confirm(`Deseja resetar a senha de ${USERS[key].name} para o padrão?`)) {
+            return;
+        }
+
+        // Senhas padrão
+        const defaultPasswords = {
+            admin: 'admin123',
+            loja1: 'loja1', loja2: 'loja2', loja3: 'loja3', loja4: 'loja4',
+            loja5: 'loja5', loja6: 'loja6', loja7: 'loja7', loja8: 'loja8',
+            loja9: 'loja9', loja10: 'loja10', loja11: 'loja11', loja12: 'loja12',
+            loja13: 'loja13', loja14: 'loja14', loja15: 'loja15', loja16: 'loja16'
+        };
+
+        USERS[key].password = defaultPasswords[key];
+        saveUsers();
+
+        // Mostrar mensagem de sucesso
+        const msg = document.getElementById(`msg-${key}`);
+        msg.textContent = '✓ Senha resetada para padrão!';
+        msg.style.display = 'block';
+        setTimeout(() => {
+            msg.textContent = '✓ Senha atualizada!';
+            msg.style.display = 'none';
+        }, 3000);
+    }
+
+    // === FUNÇÕES DO RODAPÉ COM SALVAMENTO AUTOMÁTICO ===
+    function openDetailFooter(rowIndex) {
+        const row = csvData[rowIndex];
+        if (!row) return;
+
+        currentRowIndex = rowIndex;
+
+        // Carrega status
+        const currentStatus = row[STATUS_COLUMN] || 'Em Andamento';
+        document.getElementById('detailStatus').value = currentStatus;
+
+        // Mostrar/ocultar campo de motivo de cancelamento
+        const cancelReasonColumn = "Motivo Cancelamento/Desistência";
+        const cancelReasonField = document.getElementById('cancelReasonField');
+        const cancelReasonTextarea = document.getElementById('detailCancelReason');
+        
+        if ((currentStatus === 'Cancelado' || currentStatus === 'Desistido') && row[cancelReasonColumn]) {
+            cancelReasonField.style.display = 'block';
+            cancelReasonTextarea.value = row[cancelReasonColumn];
+        } else {
+            cancelReasonField.style.display = 'none';
+            cancelReasonTextarea.value = '';
+        }
+
+        // Busca coluna de protocolo (flexível)
+        const protocoloRegex = /protocolo|nota/i;
+        const protocoloCol = headers.find(h => protocoloRegex.test(h));
+        document.getElementById('detailProtocolo').value = protocoloCol ? (row[protocoloCol] || '') : '';
+
+        document.getElementById('detailNfeDev').textContent = row[NFE_DEV_COLUMN] || 'N/D';
+        document.getElementById('detailNfeDevInput').value = row[NFE_DEV_COLUMN] || '';
+        document.getElementById('detailVolumes').value = row[VOLUMES_COLUMN] || 1;
+
+        // Busca coluna de observações (flexível)
+        const obsRegex = /obs|observação|observacoes|descricao/i;
+        const obsCol = headers.find(h => obsRegex.test(h));
+        document.getElementById('detailObs').value = obsCol ? (row[obsCol] || '') : '';
+
+        document.getElementById('rodape').classList.add('aberto');
+
+        // Remove eventos antigos para evitar duplicação
+        const statusSelect = document.getElementById('detailStatus');
+        const protocoloInput = document.getElementById('detailProtocolo');
+        const nfeDevInput = document.getElementById('detailNfeDevInput');
+        const volInput = document.getElementById('detailVolumes');
+        const obsInput = document.getElementById('detailObs');
+        statusSelect.onchange = null;
+        protocoloInput.oninput = null;
+        nfeDevInput.oninput = null;
+        volInput.onchange = null;
+        obsInput.oninput = null;
+
+        // SALVAMENTO AUTOMÁTICO DE STATUS
+        statusSelect.onchange = function () {
+            if (currentRowIndex === null) return;
+
+            const newStatus = this.value;
+            
+            // Se for cancelamento ou desistência, abrir modal para motivo
+            if (newStatus === 'Cancelado' || newStatus === 'Desistido') {
+                showCancelModal(newStatus);
+                return;
+            }
+
+            const oldData = {...csvData[currentRowIndex]};
+            csvData[currentRowIndex][STATUS_COLUMN] = newStatus;
+            logChange('updated', csvData[currentRowIndex], oldData);
+            saveToLocalStorage();
+            applyFilters();
+
+            this.classList.add('saving');
+            setTimeout(() => this.classList.remove('saving'), 300);
+        };
+
+        // SALVAMENTO AUTOMÁTICO DE PROTOCOLO
+        let protocoloTimer;
+        protocoloInput.oninput = function () {
+            if (currentRowIndex === null) return;
+
+            const protocoloRegex = /protocolo|nota/i;
+            let protocoloCol = headers.find(h => protocoloRegex.test(h));
+            if (!protocoloCol) {
+                protocoloCol = "Protocolo";
+                if (!headers.includes(protocoloCol)) {
+                    headers.push(protocoloCol);
+                }
+            }
+
+            const oldData = {...csvData[currentRowIndex]};
+            csvData[currentRowIndex][protocoloCol] = this.value;
+            saveToLocalStorage();
+            applyFilters();
+
+            this.classList.add('saving');
+            setTimeout(() => this.classList.remove('saving'), 300);
+            
+            // Log após 2 segundos de inatividade
+            clearTimeout(protocoloTimer);
+            protocoloTimer = setTimeout(() => logChange('updated', csvData[currentRowIndex], oldData), 2000);
+        };
+
+        // SALVAMENTO AUTOMÁTICO DE NFE-DEV
+        let nfeDevTimer;
+        nfeDevInput.oninput = function () {
+            if (currentRowIndex === null) return;
+
+            const oldData = {...csvData[currentRowIndex]};
+            csvData[currentRowIndex][NFE_DEV_COLUMN] = this.value;
+            document.getElementById('detailNfeDev').textContent = this.value || 'N/D';
+            saveToLocalStorage();
+            applyFilters();
+
+            this.classList.add('saving');
+            setTimeout(() => this.classList.remove('saving'), 300);
+            
+            // Log após 2 segundos de inatividade
+            clearTimeout(nfeDevTimer);
+            nfeDevTimer = setTimeout(() => logChange('updated', csvData[currentRowIndex], oldData), 2000);
+        };
+
+        // SALVAMENTO AUTOMÁTICO DE VOLUMES
+        volInput.onchange = function () {
+            if (currentRowIndex === null) return;
+            let vol = parseInt(this.value) || 1;
+            if (vol < 1) vol = 1;
+            if (vol > 99) vol = 99;
+            this.value = vol;
+
+            const oldData = {...csvData[currentRowIndex]};
+            csvData[currentRowIndex][VOLUMES_COLUMN] = vol;
+            logChange('updated', csvData[currentRowIndex], oldData);
+            saveToLocalStorage();
+            applyFilters();
+
+            this.classList.add('saving');
+            setTimeout(() => this.classList.remove('saving'), 500);
+        };
+
+        // SALVAMENTO AUTOMÁTICO DE OBSERVAÇÕES (em tempo real)
+        let obsTimer;
+        obsInput.oninput = function () {
+            if (currentRowIndex === null) return;
+
+            let obsCol = headers.find(h => obsRegex.test(h));
+            if (!obsCol) {
+                obsCol = "Observações";
+                if (!headers.includes(obsCol)) {
+                    headers.push(obsCol);
+                }
+            }
+
+            const oldData = {...csvData[currentRowIndex]};
+            csvData[currentRowIndex][obsCol] = this.value;
+            saveToLocalStorage();
+
+            this.classList.add('saving');
+            setTimeout(() => this.classList.remove('saving'), 300);
+            
+            // Log após 2 segundos de inatividade
+            clearTimeout(obsTimer);
+            obsTimer = setTimeout(() => logChange('updated', csvData[currentRowIndex], oldData), 2000);
+        };
+    }
+
+    function closeDetailFooter() {
+        document.getElementById('rodape').classList.remove('aberto');
+        currentRowIndex = null;
+    }
+
+    document.getElementById('rodape').addEventListener('click', e => {
+        if (e.target === document.getElementById('rodape')) closeDetailFooter();
+    });
+
+    // === HISTÓRICO DE ALTERAÇÕES ===
+    function loadHistory() {
+        const saved = localStorage.getItem('changeHistory');
+        if (saved) {
+            changeHistory = JSON.parse(saved);
+        }
+    }
+
+    function saveHistory() {
+        localStorage.setItem('changeHistory', JSON.stringify(changeHistory));
+    }
+
+    function logChange(action, data, oldData = null) {
+        if (!currentUser) return;
+
+        const entry = {
+            id: Date.now(),
+            timestamp: getCurrentTimestamp(),
+            action: action, // 'created', 'updated', 'deleted'
+            user: currentUser.name,
+            userType: currentUser.type,
+            data: {...data}
+        };
+
+        if (oldData && action === 'updated') {
+            entry.changes = {};
+            Object.keys(data).forEach(key => {
+                if (data[key] !== oldData[key]) {
+                    entry.changes[key] = {
+                        old: oldData[key],
+                        new: data[key]
+                    };
+                }
+            });
+        }
+
+        changeHistory.unshift(entry); // Adiciona no início
+        
+        // Manter apenas últimas 500 entradas
+        if (changeHistory.length > 500) {
+            changeHistory = changeHistory.slice(0, 500);
+        }
+        
+        saveHistory();
+    }
+
+    function showHistory() {
+        if (!currentUser || currentUser.type !== 'admin') {
+            alert('Acesso negado. Apenas administradores podem acessar esta página.');
+            return;
+        }
+        document.getElementById('dashboard-page').style.display = 'none';
+        document.getElementById('registrar-page').style.display = 'none';
+        document.getElementById('user-management-page').style.display = 'none';
+        document.getElementById('history-page').style.display = 'block';
+        document.getElementById('import-page').style.display = 'none';
+        document.getElementById('reports-page').style.display = 'none';
+        renderHistory();
+    }
+
+    function renderHistory() {
+        populateHistoryFilters();
+        applyHistoryFilters();
+    }
+
+    function populateHistoryFilters() {
+        const userFilter = document.getElementById('historyUserFilter');
+        const users = [...new Set(changeHistory.map(h => h.user))];
+        
+        userFilter.innerHTML = '<option value="">Todos os Usuários</option>';
+        users.forEach(user => {
+            userFilter.innerHTML += `<option value="${user}">${user}</option>`;
+        });
+
+        // Adicionar eventos de filtro
+        document.getElementById('historyActionFilter').onchange = applyHistoryFilters;
+        document.getElementById('historyUserFilter').onchange = applyHistoryFilters;
+        document.getElementById('historyDateFilter').onchange = applyHistoryFilters;
+    }
+
+    function applyHistoryFilters() {
+        const actionFilter = document.getElementById('historyActionFilter').value;
+        const userFilter = document.getElementById('historyUserFilter').value;
+        const dateFilter = document.getElementById('historyDateFilter').value;
+
+        let filtered = [...changeHistory];
+
+        if (actionFilter) {
+            filtered = filtered.filter(h => h.action === actionFilter);
+        }
+
+        if (userFilter) {
+            filtered = filtered.filter(h => h.user === userFilter);
+        }
+
+        if (dateFilter) {
+            filtered = filtered.filter(h => {
+                const entryDate = h.timestamp.split(' ')[0];
+                const [d, m, y] = entryDate.split('/');
+                const entryDateFormatted = `${y}-${m}-${d}`;
+                return entryDateFormatted === dateFilter;
+            });
+        }
+
+        renderHistoryItems(filtered);
+    }
+
+    function renderHistoryItems(items) {
+        const container = document.getElementById('historyContainer');
+        
+        if (items.length === 0) {
+            container.innerHTML = `
+                <div class="no-history">
+                    <i class="fas fa-history"></i>
+                    <div>Nenhum registro encontrado no histórico</div>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        items.forEach(item => {
+            html += createHistoryItem(item);
+        });
+        container.innerHTML = html;
+    }
+
+    function createHistoryItem(item) {
+        const actionLabels = {
+            created: 'Criado',
+            updated: 'Atualizado',
+            deleted: 'Excluído'
+        };
+
+        const actionClass = item.action;
+        const actionLabel = actionLabels[item.action] || item.action;
+
+        let detailsHtml = '';
+
+        if (item.action === 'created' || item.action === 'deleted') {
+            // Mostrar dados principais
+            const mainFields = [NFE_DEV_COLUMN, STATUS_COLUMN, 'Loja'];
+            detailsHtml = '<div class="history-details">';
+            mainFields.forEach(field => {
+                if (item.data[field]) {
+                    detailsHtml += `
+                        <div class="history-field">
+                            <strong>${field}</strong>
+                            <span>${escapeHtml(String(item.data[field]))}</span>
+                        </div>
+                    `;
+                }
+            });
+            detailsHtml += '</div>';
+        } else if (item.action === 'updated' && item.changes) {
+            // Mostrar alterações
+            detailsHtml = '<div class="history-details">';
+            Object.keys(item.changes).forEach(field => {
+                const change = item.changes[field];
+                detailsHtml += `
+                    <div class="history-field">
+                        <strong>${field}</strong>
+                        <div class="history-change">
+                            <span class="history-old">${escapeHtml(String(change.old || '-'))}</span>
+                            <span class="history-arrow">→</span>
+                            <span class="history-new">${escapeHtml(String(change.new || '-'))}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            detailsHtml += '</div>';
+        }
+
+        return `
+            <div class="history-item">
+                <div class="history-header">
+                    <div>
+                        <span class="history-action ${actionClass}">${actionLabel}</span>
+                        <span class="history-user">
+                            <i class="fas fa-user"></i>
+                            ${item.user}
+                        </span>
+                    </div>
+                    <span class="history-timestamp">${item.timestamp}</span>
+                </div>
+                ${detailsHtml}
+            </div>
+        `;
+    }
+
+    function clearHistory() {
+        if (!confirm('Tem certeza que deseja limpar todo o histórico? Esta ação não pode ser desfeita.')) {
+            return;
+        }
+        changeHistory = [];
+        saveHistory();
+        renderHistory();
+    }
+
+    // === MODAL DE MOTIVO DE CANCELAMENTO ===
+    function showCancelModal(newStatus) {
+        const modal = document.getElementById('cancelModal');
+        const title = document.getElementById('cancelModalTitle');
+        const textarea = document.getElementById('cancelReason');
+        
+        title.textContent = newStatus === 'Cancelado' ? 'Motivo do Cancelamento' : 'Motivo da Desistência';
+        textarea.value = '';
+        modal.classList.add('active');
+        textarea.focus();
+        
+        pendingStatusChange = newStatus;
+        
+        // Adicionar evento de teclado
+        textarea.onkeydown = function(e) {
+            if (e.key === 'Escape') {
+                closeCancelModal();
+            } else if (e.key === 'Enter' && e.ctrlKey) {
+                confirmCancellation();
+            }
+        };
+        
+        // Click fora do modal para fechar
+        modal.onclick = function(e) {
+            if (e.target === modal) {
+                const reason = textarea.value.trim();
+                if (reason && !confirm('Deseja descartar o texto digitado?')) {
+                    return;
+                }
+                closeCancelModal();
+            }
+        };
+    }
+
+    function closeCancelModal() {
+        const modal = document.getElementById('cancelModal');
+        modal.classList.remove('active');
+        pendingStatusChange = null;
+        
+        // Reverter o select para o valor anterior
+        if (currentRowIndex !== null) {
+            document.getElementById('detailStatus').value = csvData[currentRowIndex][STATUS_COLUMN];
+        }
+    }
+
+    function confirmCancellation() {
+        const reason = document.getElementById('cancelReason').value.trim();
+        
+        if (!reason) {
+            alert('Por favor, descreva o motivo.');
+            return;
+        }
+        
+        if (currentRowIndex === null || !pendingStatusChange) return;
+        
+        const oldData = {...csvData[currentRowIndex]};
+        
+        // Criar/atualizar coluna de motivo de cancelamento
+        const cancelReasonColumn = "Motivo Cancelamento/Desistência";
+        if (!headers.includes(cancelReasonColumn)) {
+            headers.push(cancelReasonColumn);
+        }
+        
+        csvData[currentRowIndex][STATUS_COLUMN] = pendingStatusChange;
+        csvData[currentRowIndex][cancelReasonColumn] = reason;
+        
+        logChange('updated', csvData[currentRowIndex], oldData);
+        saveToLocalStorage();
+        applyFilters();
+        
+        // Mostrar o campo de motivo no rodapé
+        const cancelReasonField = document.getElementById('cancelReasonField');
+        const cancelReasonTextarea = document.getElementById('detailCancelReason');
+        cancelReasonField.style.display = 'block';
+        cancelReasonTextarea.value = reason;
+        
+        // Fechar modal
+        const modal = document.getElementById('cancelModal');
+        modal.classList.remove('active');
+        pendingStatusChange = null;
+        
+        // Feedback visual
+        const statusSelect = document.getElementById('detailStatus');
+        statusSelect.classList.add('saving');
+        setTimeout(() => statusSelect.classList.remove('saving'), 300);
+    }
+
+    // === IMPORTAÇÃO DE CSV ===
+    function showImport() {
+        if (!currentUser || currentUser.type !== 'admin') {
+            alert('Acesso negado. Apenas administradores podem acessar esta página.');
+            return;
+        }
+        document.getElementById('dashboard-page').style.display = 'none';
+        document.getElementById('registrar-page').style.display = 'none';
+        document.getElementById('user-management-page').style.display = 'none';
+        document.getElementById('history-page').style.display = 'none';
+        document.getElementById('import-page').style.display = 'block';
+        document.getElementById('reports-page').style.display = 'none';
+        initImportPage();
+    }
+
+    function initImportPage() {
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('csvFileInput');
+        
+        // Click para abrir seletor
+        uploadArea.onclick = () => fileInput.click();
+        
+        // Drag & Drop
+        uploadArea.ondragover = (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        };
+        
+        uploadArea.ondragleave = () => {
+            uploadArea.classList.remove('drag-over');
+        };
+        
+        uploadArea.ondrop = (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith('.csv')) {
+                processCSVFile(file);
+            } else {
+                alert('Por favor, selecione um arquivo CSV válido.');
+            }
+        };
+        
+        // Seleção de arquivo
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                processCSVFile(file);
+            }
+        };
+        
+        // Reset preview
+        document.getElementById('previewContainer').style.display = 'none';
+        pendingImportData = null;
+    }
+
+    function selectImportMode(mode) {
+        importMode = mode;
+        document.querySelectorAll('.import-option').forEach(opt => {
+            opt.classList.remove('selected');
+        });
+        event.currentTarget.classList.add('selected');
+        document.querySelector(`input[value="${mode}"]`).checked = true;
+    }
+
+    function processCSVFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target.result;
+            Papa.parse(text, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    if (results.errors.length > 0) {
+                        alert('Erro ao processar CSV: ' + results.errors[0].message);
+                        return;
+                    }
+                    
+                    if (results.data.length === 0) {
+                        alert('O arquivo CSV está vazio.');
+                        return;
+                    }
+                    
+                    pendingImportData = {
+                        data: results.data,
+                        headers: results.meta.fields
+                    };
+                    
+                    showPreview(results.data, results.meta.fields);
+                }
+            });
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    function showPreview(data, importHeaders) {
+        const container = document.getElementById('previewContainer');
+        const tableDiv = document.getElementById('previewTable');
+        
+        // Atualizar estatísticas
+        document.getElementById('previewRows').textContent = data.length;
+        document.getElementById('previewColumns').textContent = importHeaders.length;
+        
+        // Mostrar preview (primeiras 10 linhas)
+        const previewData = data.slice(0, 10);
+        let html = '<table><thead><tr>';
+        importHeaders.forEach(h => {
+            html += `<th>${escapeHtml(h)}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+        
+        previewData.forEach(row => {
+            html += '<tr>';
+            importHeaders.forEach(h => {
+                html += `<td>${escapeHtml(String(row[h] || ''))}</td>`;
+            });
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        tableDiv.innerHTML = html;
+        
+        // Mostrar container
+        container.style.display = 'block';
+        container.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function cancelImport() {
+        if (confirm('Deseja cancelar a importação?')) {
+            document.getElementById('previewContainer').style.display = 'none';
+            document.getElementById('csvFileInput').value = '';
+            pendingImportData = null;
+        }
+    }
+
+    function confirmImport() {
+        if (!pendingImportData) {
+            alert('Nenhum dado para importar.');
+            return;
+        }
+        
+        const confirmMsg = importMode === 'replace' 
+            ? `ATENÇÃO: Todos os ${csvData.length} registros existentes serão APAGADOS e substituídos pelos ${pendingImportData.data.length} novos registros.\n\nEsta ação não pode ser desfeita. Deseja continuar?`
+            : `Adicionar ${pendingImportData.data.length} novos registros aos ${csvData.length} existentes?`;
+        
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+        
+        const btn = document.getElementById('btnConfirmImport');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+        
+        setTimeout(() => {
+            try {
+                if (importMode === 'replace') {
+                    // Substituir tudo
+                    csvData = pendingImportData.data;
+                    headers = pendingImportData.headers;
+                    
+                    // Log da importação
+                    logChange('created', {
+                        action: 'Importação (Substituição)',
+                        registros: csvData.length,
+                        colunas: headers.length
+                    });
+                } else {
+                    // Mesclar dados
+                    const oldCount = csvData.length;
+                    
+                    // Mesclar headers
+                    pendingImportData.headers.forEach(h => {
+                        if (!headers.includes(h)) {
+                            headers.push(h);
+                        }
+                    });
+                    
+                    // Adicionar novos dados
+                    pendingImportData.data.forEach(row => {
+                        csvData.push(row);
+                    });
+                    
+                    // Log da importação
+                    logChange('created', {
+                        action: 'Importação (Mesclagem)',
+                        registros_novos: pendingImportData.data.length,
+                        registros_totais: csvData.length
+                    });
+                }
+                
+                // Garantir colunas essenciais
+                ensureColumns();
+                
+                // Salvar
+                saveToLocalStorage();
+                
+                alert(`✓ Importação concluída com sucesso!\n\nRegistros importados: ${pendingImportData.data.length}\nTotal de registros: ${csvData.length}`);
+                
+                // Voltar ao dashboard
+                showDashboard();
+                
+            } catch (error) {
+                alert('Erro ao importar: ' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check"></i> Confirmar Importação';
+            }
+        }, 500);
+    }
+
+    // === RESTANTE DO CÓDIGO ORIGINAL (100% PRESERVADO) ===
+    function showDashboard() {
+        document.getElementById('dashboard-page').style.display = 'block';
+        document.getElementById('registrar-page').style.display = 'none';
+        document.getElementById('user-management-page').style.display = 'none';
+        document.getElementById('history-page').style.display = 'none';
+        document.getElementById('import-page').style.display = 'none';
+        document.getElementById('reports-page').style.display = 'none';
+        renderAll();
+    }
+    function showRegistrar() {
+        document.getElementById('dashboard-page').style.display = 'none';
+        document.getElementById('registrar-page').style.display = 'block';
+        document.getElementById('user-management-page').style.display = 'none';
+        document.getElementById('history-page').style.display = 'none';
+        document.getElementById('import-page').style.display = 'none';
+        document.getElementById('reports-page').style.display = 'none';
+        generateForm(headers);
+    }
+    function showUserManagement() {
+        if (!currentUser || currentUser.type !== 'admin') {
+            alert('Acesso negado. Apenas administradores podem acessar esta página.');
+            return;
+        }
+        document.getElementById('dashboard-page').style.display = 'none';
+        document.getElementById('registrar-page').style.display = 'none';
+        document.getElementById('user-management-page').style.display = 'block';
+        document.getElementById('history-page').style.display = 'none';
+        document.getElementById('import-page').style.display = 'none';
+        document.getElementById('reports-page').style.display = 'none';
+        renderUserManagement();
+    }
+
+    function showReports() {
+        if (!currentUser || currentUser.type !== 'admin') {
+            alert('Acesso negado. Apenas administradores podem acessar relatórios personalizados.');
+            return;
+        }
+        document.getElementById('dashboard-page').style.display = 'none';
+        document.getElementById('registrar-page').style.display = 'none';
+        document.getElementById('user-management-page').style.display = 'none';
+        document.getElementById('history-page').style.display = 'none';
+        document.getElementById('import-page').style.display = 'none';
+        document.getElementById('reports-page').style.display = 'block';
+        initializeReports();
+    }
+
+    function initializeReports() {
+        // Preencher campos disponíveis
+        const container = document.getElementById('reportFieldsContainer');
+        container.innerHTML = '';
+        headers.forEach(h => {
+            container.innerHTML += `
+                <div class="checkbox-item">
+                    <input type="checkbox" id="field_${h}" value="${h}" checked>
+                    <label for="field_${h}">${h}</label>
+                </div>
+            `;
+        });
+
+        // Preencher filtros de loja e motivo
+        populateReportFilters();
+        
+        // Definir datas padrão (último mês)
+        const today = new Date();
+        const lastMonth = new Date();
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        document.getElementById('reportEndDate').value = today.toISOString().split('T')[0];
+        document.getElementById('reportStartDate').value = lastMonth.toISOString().split('T')[0];
+    }
+
+    function populateReportFilters() {
+        const lojas = [...new Set(csvData.map(row => getValue(row, /loja|und.*negocio/i)).filter(v => v))];
+        const motivos = [...new Set(csvData.map(row => getValue(row, /motivo/i)).filter(v => v))];
+        
+        const lojaSelect = document.getElementById('reportLoja');
+        lojaSelect.innerHTML = '<option value="">Todas</option>';
+        lojas.forEach(l => lojaSelect.innerHTML += `<option value="${l}">${l}</option>`);
+        
+        const motivoSelect = document.getElementById('reportMotivo');
+        motivoSelect.innerHTML = '<option value="">Todos</option>';
+        motivos.forEach(m => motivoSelect.innerHTML += `<option value="${m}">${m}</option>`);
+    }
+
+    function applyPredefinedPeriod() {
+        const period = document.getElementById('reportPeriod').value;
+        const today = new Date();
+        const startInput = document.getElementById('reportStartDate');
+        const endInput = document.getElementById('reportEndDate');
+        
+        endInput.value = today.toISOString().split('T')[0];
+        
+        switch(period) {
+            case 'today':
+                startInput.value = today.toISOString().split('T')[0];
+                break;
+            case 'week':
+                const weekStart = new Date(today);
+                weekStart.setDate(today.getDate() - today.getDay());
+                startInput.value = weekStart.toISOString().split('T')[0];
+                break;
+            case 'month':
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                startInput.value = monthStart.toISOString().split('T')[0];
+                break;
+            case 'quarter':
+                const quarter = Math.floor(today.getMonth() / 3);
+                const quarterStart = new Date(today.getFullYear(), quarter * 3, 1);
+                startInput.value = quarterStart.toISOString().split('T')[0];
+                break;
+            case 'year':
+                const yearStart = new Date(today.getFullYear(), 0, 1);
+                startInput.value = yearStart.toISOString().split('T')[0];
+                break;
+            case 'last30':
+                const last30 = new Date(today);
+                last30.setDate(today.getDate() - 30);
+                startInput.value = last30.toISOString().split('T')[0];
+                break;
+            case 'last90':
+                const last90 = new Date(today);
+                last90.setDate(today.getDate() - 90);
+                startInput.value = last90.toISOString().split('T')[0];
+                break;
+        }
+    }
+
+    function selectAllFields() {
+        document.querySelectorAll('#reportFieldsContainer input[type="checkbox"]').forEach(cb => cb.checked = true);
+    }
+
+    function deselectAllFields() {
+        document.querySelectorAll('#reportFieldsContainer input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
+
+    function clearReportFilters() {
+        document.getElementById('reportPeriod').value = '';
+        document.getElementById('reportStatus').value = '';
+        document.getElementById('reportLoja').value = '';
+        document.getElementById('reportMotivo').value = '';
+        document.getElementById('reportCliente').value = '';
+        document.getElementById('reportGroupBy').value = '';
+        document.getElementById('reportSortBy').value = 'timestamp-desc';
+        selectAllFields();
+        document.getElementById('reportPreviewSection').style.display = 'none';
+    }
+
+    function generateReport() {
+        const filteredData = filterReportData();
+        
+        if (filteredData.length === 0) {
+            alert('Nenhum registro encontrado com os filtros aplicados.');
+            return;
+        }
+
+        const selectedFields = getSelectedFields();
+        const groupBy = document.getElementById('reportGroupBy').value;
+        
+        // Mostrar resumo
+        displayReportSummary(filteredData);
+        
+        // Mostrar prévia
+        displayReportPreview(filteredData, selectedFields, groupBy);
+        
+        document.getElementById('reportPreviewSection').style.display = 'block';
+        document.getElementById('reportPreviewSection').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function filterReportData() {
+        const startDate = document.getElementById('reportStartDate').value;
+        const endDate = document.getElementById('reportEndDate').value;
+        const statusFilter = Array.from(document.getElementById('reportStatus').selectedOptions).map(o => o.value);
+        const lojaFilter = document.getElementById('reportLoja').value;
+        const motivoFilter = document.getElementById('reportMotivo').value;
+        const clienteFilter = document.getElementById('reportCliente').value.toLowerCase();
+        
+        return csvData.filter(row => {
+            // Filtro de data
+            if (startDate || endDate) {
+                const rowDate = parseTimestamp(row[TIMESTAMP_COLUMN]);
+                if (!rowDate) return false;
+                if (startDate && rowDate < new Date(startDate)) return false;
+                if (endDate && rowDate > new Date(endDate + 'T23:59:59')) return false;
+            }
+            
+            // Filtro de status
+            if (statusFilter.length > 0 && !statusFilter.includes('') && !statusFilter.includes(row[STATUS_COLUMN])) {
+                return false;
+            }
+            
+            // Filtro de loja
+            if (lojaFilter && getValue(row, /loja|und.*negocio/i) !== lojaFilter) return false;
+            
+            // Filtro de motivo
+            if (motivoFilter && getValue(row, /motivo/i) !== motivoFilter) return false;
+            
+            // Filtro de cliente
+            if (clienteFilter && !getValue(row, /cliente|fornecedor/i).toLowerCase().includes(clienteFilter)) return false;
+            
+            return true;
+        });
+    }
+
+    function getSelectedFields() {
+        return Array.from(document.querySelectorAll('#reportFieldsContainer input[type="checkbox"]:checked'))
+            .map(cb => cb.value);
+    }
+
+    function displayReportSummary(data) {
+        const summary = document.getElementById('reportSummary');
+        const totalRecords = data.length;
+        const statusCount = {};
+        const totalVolumes = data.reduce((sum, row) => sum + parseInt(row[VOLUMES_COLUMN] || 1), 0);
+        
+        data.forEach(row => {
+            const status = row[STATUS_COLUMN] || 'Indefinido';
+            statusCount[status] = (statusCount[status] || 0) + 1;
+        });
+        
+        summary.innerHTML = `
+            <div class="stat-card green">
+                <h4>Total de Registros</h4>
+                <div class="value">${totalRecords}</div>
+            </div>
+            <div class="stat-card blue">
+                <h4>Total de Volumes</h4>
+                <div class="value">${totalVolumes}</div>
+            </div>
+            <div class="stat-card orange">
+                <h4>Em Andamento</h4>
+                <div class="value">${statusCount['Em Andamento'] || 0}</div>
+            </div>
+            <div class="stat-card">
+                <h4>Coletados</h4>
+                <div class="value">${statusCount['Coletado'] || 0}</div>
+            </div>
+        `;
+    }
+
+    function displayReportPreview(data, fields, groupBy) {
+        const table = document.getElementById('reportPreviewTable');
+        const sortBy = document.getElementById('reportSortBy').value;
+        
+        // Ordenar dados
+        const sortedData = sortReportData(data, sortBy);
+        
+        // Limitar prévia a 50 registros
+        const previewData = sortedData.slice(0, 50);
+        
+        let html = '<thead><tr>';
+        fields.forEach(f => html += `<th>${f}</th>`);
+        html += '</tr></thead><tbody>';
+        
+        if (groupBy) {
+            const grouped = groupReportData(previewData, groupBy);
+            Object.keys(grouped).forEach(group => {
+                html += `<tr style="background:#e3f2fd;font-weight:bold;"><td colspan="${fields.length}">${group} (${grouped[group].length} registros)</td></tr>`;
+                grouped[group].forEach(row => {
+                    html += '<tr>';
+                    fields.forEach(f => html += `<td>${row[f] || '-'}</td>`);
+                    html += '</tr>';
+                });
+            });
+        } else {
+            previewData.forEach(row => {
+                html += '<tr>';
+                fields.forEach(f => html += `<td>${row[f] || '-'}</td>`);
+                html += '</tr>';
+            });
+        }
+        
+        html += '</tbody>';
+        if (sortedData.length > 50) {
+            html += `<tfoot><tr><td colspan="${fields.length}" style="text-align:center;font-style:italic;color:#666;">Mostrando 50 de ${sortedData.length} registros</td></tr></tfoot>`;
+        }
+        table.innerHTML = html;
+    }
+
+    function sortReportData(data, sortBy) {
+        const sorted = [...data];
+        switch(sortBy) {
+            case 'timestamp-desc':
+                sorted.sort((a, b) => parseTimestamp(b[TIMESTAMP_COLUMN]) - parseTimestamp(a[TIMESTAMP_COLUMN]));
+                break;
+            case 'timestamp-asc':
+                sorted.sort((a, b) => parseTimestamp(a[TIMESTAMP_COLUMN]) - parseTimestamp(b[TIMESTAMP_COLUMN]));
+                break;
+            case 'nfe-asc':
+                sorted.sort((a, b) => (a[NFE_DEV_COLUMN] || '').localeCompare(b[NFE_DEV_COLUMN] || ''));
+                break;
+            case 'nfe-desc':
+                sorted.sort((a, b) => (b[NFE_DEV_COLUMN] || '').localeCompare(a[NFE_DEV_COLUMN] || ''));
+                break;
+            case 'status':
+                sorted.sort((a, b) => (a[STATUS_COLUMN] || '').localeCompare(b[STATUS_COLUMN] || ''));
+                break;
+        }
+        return sorted;
+    }
+
+    function groupReportData(data, groupBy) {
+        const grouped = {};
+        data.forEach(row => {
+            let key;
+            switch(groupBy) {
+                case 'status':
+                    key = row[STATUS_COLUMN] || 'Indefinido';
+                    break;
+                case 'loja':
+                    key = getValue(row, /loja|und.*negocio/i) || 'Não especificado';
+                    break;
+                case 'motivo':
+                    key = getValue(row, /motivo/i) || 'Não especificado';
+                    break;
+                case 'data':
+                    const date = parseTimestamp(row[TIMESTAMP_COLUMN]);
+                    key = date ? date.toLocaleDateString('pt-BR') : 'Sem data';
+                    break;
+                case 'mes':
+                    const dateM = parseTimestamp(row[TIMESTAMP_COLUMN]);
+                    key = dateM ? `${dateM.toLocaleString('pt-BR', {month: 'long'})} ${dateM.getFullYear()}` : 'Sem data';
+                    break;
+                default:
+                    key = 'Outros';
+            }
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(row);
+        });
+        return grouped;
+    }
+
+    function exportReport() {
+        const filteredData = filterReportData();
+        
+        if (filteredData.length === 0) {
+            alert('Nenhum registro para exportar.');
+            return;
+        }
+
+        const selectedFields = getSelectedFields();
+        const format = document.getElementById('reportFormat').value;
+        const sortBy = document.getElementById('reportSortBy').value;
+        const sortedData = sortReportData(filteredData, sortBy);
+        
+        switch(format) {
+            case 'csv':
+                exportToCSV(sortedData, selectedFields);
+                break;
+            case 'excel':
+                exportToExcel(sortedData, selectedFields);
+                break;
+            case 'pdf':
+                exportToPDF(sortedData, selectedFields);
+                break;
+        }
+    }
+
+    function exportToCSV(data, fields) {
+        let csv = fields.join(',') + '\n';
+        data.forEach(row => {
+            csv += fields.map(f => {
+                const val = row[f] || '';
+                return `"${String(val).replace(/"/g, '""')}"`;
+            }).join(',') + '\n';
+        });
+        
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `relatorio_devolucoes_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        
+        showNotification('success', 'Relatório CSV exportado com sucesso!');
+    }
+
+    function exportToExcel(data, fields) {
+        // Criar HTML da tabela
+        let html = '<html><head><meta charset="utf-8"><style>table{border-collapse:collapse;}th,td{border:1px solid black;padding:8px;}</style></head><body>';
+        html += '<h2>Relatório de Devoluções</h2>';
+        html += `<p>Gerado em: ${getCurrentTimestamp()}</p>`;
+        html += `<p>Total de registros: ${data.length}</p>`;
+        html += '<table><thead><tr>';
+        fields.forEach(f => html += `<th>${f}</th>`);
+        html += '</tr></thead><tbody>';
+        data.forEach(row => {
+            html += '<tr>';
+            fields.forEach(f => html += `<td>${row[f] || ''}</td>`);
+            html += '</tr>';
+        });
+        html += '</tbody></table></body></html>';
+        
+        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `relatorio_devolucoes_${new Date().toISOString().split('T')[0]}.xls`;
+        link.click();
+        
+        showNotification('success', 'Relatório Excel exportado com sucesso!');
+    }
+
+    function exportToPDF(data, fields) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.text("RELATÓRIO DE DEVOLUÇÕES", pageWidth / 2, 15, { align: "center" });
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Gerado em: ${getCurrentTimestamp()}`, pageWidth / 2, 22, { align: "center" });
+        doc.text(`Total de registros: ${data.length}`, pageWidth / 2, 27, { align: "center" });
+        
+        // Preparar dados para a tabela
+        const tableData = data.map(row => fields.map(f => row[f] || ''));
+        
+        doc.autoTable({
+            startY: 35,
+            head: [fields],
+            body: tableData,
+            theme: 'grid',
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [40, 167, 69], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+            margin: { left: 10, right: 10 }
+        });
+        
+        doc.save(`relatorio_devolucoes_${new Date().toISOString().split('T')[0]}.pdf`);
+        
+        showNotification('success', 'Relatório PDF exportado com sucesso!');
+    }
+
+    function saveReportTemplate() {
+        const template = {
+            startDate: document.getElementById('reportStartDate').value,
+            endDate: document.getElementById('reportEndDate').value,
+            period: document.getElementById('reportPeriod').value,
+            status: Array.from(document.getElementById('reportStatus').selectedOptions).map(o => o.value),
+            loja: document.getElementById('reportLoja').value,
+            motivo: document.getElementById('reportMotivo').value,
+            cliente: document.getElementById('reportCliente').value,
+            fields: getSelectedFields(),
+            groupBy: document.getElementById('reportGroupBy').value,
+            sortBy: document.getElementById('reportSortBy').value,
+            format: document.getElementById('reportFormat').value
+        };
+        
+        const templateName = prompt('Nome do template:');
+        if (templateName) {
+            const templates = JSON.parse(localStorage.getItem('reportTemplates') || '{}');
+            templates[templateName] = template;
+            localStorage.setItem('reportTemplates', JSON.stringify(templates));
+            showNotification('success', `Template "${templateName}" salvo com sucesso!`);
+        }
+    }
+
+    function goToAlerts() { showDashboard(); document.getElementById('alertSection').scrollIntoView(); }
+    function goToChart() { showDashboard(); document.getElementById('chartContainer').scrollIntoView(); }
+
+    function getCurrentTimestamp() {
+        const n = new Date();
+        return `${String(n.getDate()).padStart(2,'0')}/${String(n.getMonth()+1).padStart(2,'0')}/${n.getFullYear()} ${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;
+    }
+
+    function parseTimestamp(str) {
+        if (!str) return null;
+        const [date, time] = str.split(' ');
+        const [d, m, y] = date.split('/');
+        const [h, min, s] = time.split(':');
+        return new Date(y, m-1, d, h, min, s || 0);
+    }
+
+    function formatElapsed(seconds) {
+        if (seconds < 60) return `${seconds}s`;
+        const d = Math.floor(seconds / 86400);
+        const h = Math.floor((seconds % 86400) / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        return [d?`${d}d`:'', h?`${h}h`:'', m?`${m}m`:'', s?`${s}s`:''].filter(Boolean).join(' ') || '0s';
+    }
+
+    function getProtocolColumn() { return headers.find(h => h.toLowerCase().includes('protocolo')) || headers[0]; }
+    function isOverdue(ts) { const d = parseTimestamp(ts); return d && (Date.now() - d.getTime())/1000 > 30; }
+
+    function ensureColumns() {
+        if (!headers.includes(TIMESTAMP_COLUMN)) headers.push(TIMESTAMP_COLUMN);
+        if (!headers.includes(NFE_DEV_COLUMN)) headers.push(NFE_DEV_COLUMN);
+        if (!headers.includes(STATUS_COLUMN)) headers.push(STATUS_COLUMN);
+        if (!headers.includes(VOLUMES_COLUMN)) headers.push(VOLUMES_COLUMN);
+        csvData.forEach(r => {
+            r[TIMESTAMP_COLUMN] = r[TIMESTAMP_COLUMN] || "";
+            r[NFE_DEV_COLUMN] = r[NFE_DEV_COLUMN] || generateNfeDev();
+            r[STATUS_COLUMN] = r[STATUS_COLUMN] || "Em Andamento";
+            r[VOLUMES_COLUMN] = parseInt(r[VOLUMES_COLUMN]) || 1;
+        });
+    }
+
+    function generateNfeDev() {
+        const d = new Date();
+        const s = d.toISOString().slice(0,10).replace(/-/g,'');
+        const c = csvData.filter(r => (r[NFE_DEV_COLUMN]||'').startsWith(`NFE-DEV-${s}`)).length + 1;
+        return `NFE-DEV-${s}-${String(c).padStart(5,'0')}`;
+    }
+
+    function getValue(row, regex) {
+        const col = headers.find(h => regex.test(h));
+        return col ? String(row[col] || '').trim() : '';
+    }
+
+    function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+    function showNotification(type, message) {
+        const n = document.getElementById('notification');
+        n.textContent = message;
+        n.className = `notification ${type}`;
+        n.style.display = 'block';
+    }
+
+    function generateForm(h) {
+        let html = '';
+        h.forEach(col => {
+            if ([TIMESTAMP_COLUMN, STATUS_COLUMN, VOLUMES_COLUMN, NFE_DEV_COLUMN].includes(col)) return;
+            if (/und.*negocio|negocio.*und|loja/i.test(col)) {
+                // Se usuário é de uma loja específica, pré-preencher e desabilitar
+                if (currentUser && currentUser.type === 'loja') {
+                    html += `<label>${col}: <input type="text" name="${col}" value="${currentUser.loja}" readonly style="background:#f0f0f0;"></label>`;
+                } else {
+                    html += `<label>${col}: <select name="${col}" required><option value="">Selecione</option>${LOJAS.map(l=>`<option>${l}</option>`).join('')}</select></label>`;
+                }
+            } else if (/motivo/i.test(col)) {
+                html += `<label>${col}: <select name="${col}" required><option value="">Selecione</option>${MOTIVOS.map(m=>`<option>${m}</option>`).join('')}</select></label>`;
+            } else {
+                html += `<label>${col}: <input type="text" name="${col}" required></label>`;
+            }
+        });
+        document.getElementById('formFields').innerHTML = html;
+    }
+
+    function saveToLocalStorage() {
+        localStorage.setItem('csvData', JSON.stringify(csvData));
+        localStorage.setItem('csvHeaders', JSON.stringify(headers));
+        // Sincronizar com Google Sheets
+        syncToGoogleSheets();
+    }
+
+    // === GOOGLE SHEETS INTEGRATION ===
+    function gapiLoaded() {
+        gapi.load('client', initializeGapiClient);
+    }
+
+    async function initializeGapiClient() {
+        try {
+            await gapi.client.init({
+                apiKey: GOOGLE_CONFIG.API_KEY,
+                discoveryDocs: GOOGLE_CONFIG.DISCOVERY_DOCS,
+            });
+            gapiInited = true;
+            maybeEnableButtons();
+        } catch (err) {
+            console.error('Erro ao inicializar Google API:', err);
+        }
+    }
+
+    function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CONFIG.CLIENT_ID,
+            scope: GOOGLE_CONFIG.SCOPES,
+            callback: '', // definido em runtime
+        });
+        gisInited = true;
+        maybeEnableButtons();
+    }
+
+    function maybeEnableButtons() {
+        if (gapiInited && gisInited) {
+            // Tenta carregar dados ao inicializar
+            loadFromGoogleSheets();
+        }
+    }
+
+    function handleAuthClick() {
+        tokenClient.callback = async (resp) => {
+            if (resp.error !== undefined) {
+                throw (resp);
+            }
+            await syncToGoogleSheets();
+        };
+
+        if (gapi.client.getToken() === null) {
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        } else {
+            tokenClient.requestAccessToken({prompt: ''});
+        }
+    }
+
+    async function loadFromGoogleSheets() {
+        try {
+            // Se não tiver token, tenta autenticar silenciosamente
+            if (gapi.client.getToken() === null) {
+                tokenClient.callback = async (resp) => {
+                    if (resp.error !== undefined) {
+                        console.log('Usando dados locais. Faça login no Google para sincronizar.');
+                        return;
+                    }
+                    await fetchSheetData();
+                };
+                tokenClient.requestAccessToken({prompt: ''});
+            } else {
+                await fetchSheetData();
+            }
+        } catch (err) {
+            console.error('Erro ao carregar do Google Sheets:', err);
+            showNotification('error', 'Erro ao carregar dados do Google Sheets. Usando dados locais.');
+        }
+    }
+
+    async function fetchSheetData() {
+        try {
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                range: `${GOOGLE_CONFIG.SHEET_NAME}!A:ZZ`,
+            });
+
+            const rows = response.result.values;
+            if (rows && rows.length > 0) {
+                headers = rows[0];
+                csvData = rows.slice(1).map(row => {
+                    const obj = {};
+                    headers.forEach((h, i) => {
+                        obj[h] = row[i] || '';
+                    });
+                    return obj;
+                });
+                ensureColumns();
+                filteredData = [...csvData];
+                renderAll();
+                showNotification('success', 'Dados carregados do Google Sheets!');
+                // Salvar também no localStorage como backup
+                localStorage.setItem('csvData', JSON.stringify(csvData));
+                localStorage.setItem('csvHeaders', JSON.stringify(headers));
+            }
+        } catch (err) {
+            console.error('Erro ao buscar dados:', err);
+            throw err;
+        }
+    }
+
+    async function syncToGoogleSheets() {
+        if (!gapiInited || !gisInited) {
+            console.log('Google Sheets não inicializado ainda.');
+            return;
+        }
+
+        try {
+            // Se não tiver token, solicita autenticação
+            if (gapi.client.getToken() === null) {
+                handleAuthClick();
+                return;
+            }
+
+            // Preparar dados para envio
+            const values = [headers, ...csvData.map(row => headers.map(h => row[h] || ''))];
+
+            // Limpar a planilha primeiro
+            await gapi.client.sheets.spreadsheets.values.clear({
+                spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                range: `${GOOGLE_CONFIG.SHEET_NAME}!A:ZZ`,
+            });
+
+            // Atualizar com novos dados
+            const response = await gapi.client.sheets.spreadsheets.values.update({
+                spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                range: `${GOOGLE_CONFIG.SHEET_NAME}!A1`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: values },
+            });
+
+            console.log('Dados sincronizados com Google Sheets:', response.result.updatedRows, 'linhas');
+        } catch (err) {
+            console.error('Erro ao sincronizar com Google Sheets:', err);
+            // Não mostrar erro para não interromper o fluxo do usuário
+        }
+    }
+
+    function applyFilters() {
+        let data = [...csvData];
+        
+        // Aplicar filtro de permissão de usuário
+        data = filterByUserPermission(data);
+        
+        if (chartFilter !== null) {
+            const col = document.getElementById('chartColumn').value;
+            data = data.filter(r => String(r[col] || '') === chartFilter);
+        }
+        const q = document.getElementById('filterInput').value.toLowerCase();
+        if (q) data = data.filter(r => headers.some(h => String(r[h] || '').toLowerCase().includes(q)));
+        filteredData = data;
+        displayTable(filteredData);
+    }
+
+    function clearFilters() {
+        document.getElementById('filterInput').value = '';
+        chartFilter = null;
+        applyFilters();
+    }
+
+    function updateOverdueAlertAndHighlight() {
+        const now = Date.now();
+        const overdue = [];
+        const protocolCol = getProtocolColumn();
+        
+        // Filtrar dados por permissão do usuário
+        const visibleData = filterByUserPermission(csvData);
+        
+        visibleData.forEach(row => {
+            if (row[TIMESTAMP_COLUMN] && isOverdue(row[TIMESTAMP_COLUMN]) && !["Coletado","Cancelado","Desistido"].includes(row[STATUS_COLUMN])) {
+                const sec = Math.floor((now - parseTimestamp(row[TIMESTAMP_COLUMN]).getTime())/1000);
+                overdue.push({protocolo: row[protocolCol] || 'Sem protocolo', elapsed: formatElapsed(sec)});
+            }
+        });
+        const section = document.getElementById('alertSection');
+        const list = document.getElementById('alertList');
+        if (overdue.length === 0) {
+            section.style.display = 'none';
+        } else {
+            section.style.display = 'block';
+            list.innerHTML = overdue.map(i => `<div class="alert-item"><span class="protocol">${i.protocolo}</span><span class="time">${i.elapsed}</span></div>`).join('');
+        }
+        document.querySelectorAll('#tableContainer tbody tr').forEach(tr => tr.classList.remove('overdue'));
+        filteredData.forEach((row,i) => {
+            if (row[TIMESTAMP_COLUMN] && isOverdue(row[TIMESTAMP_COLUMN])) {
+                const tr = document.querySelector(`#tableContainer tbody tr:nth-child(${i+1})`);
+                if (tr) tr.classList.add('overdue');
+            }
+        });
+    }
+
+    function startMonitoring() {
+        updateOverdueAlertAndHighlight();
+        setInterval(updateOverdueAlertAndHighlight, 1000);
+    }
+
+    function renderAll() {
+        applyFilters();
+        populateChartSelect(headers);
+        generateChart(csvData);
+        document.getElementById('filterContainer').style.display = 'block';
+        document.getElementById('chartContainer').style.display = 'block';
+    }
+
+    function populateChartSelect(h) {
+        const s = document.getElementById('chartColumn');
+        s.innerHTML = h.map(x => `<option value="${x}">${x}</option>`).join('');
+        s.addEventListener('change', () => generateChart(csvData));
+    }
+
+    function generateChart(data) {
+        const ctx = document.getElementById('pieChart').getContext('2d');
+        if (chart) chart.destroy();
+        const col = document.getElementById('chartColumn').value;
+        
+        // Filtrar dados por permissão do usuário
+        const visibleData = filterByUserPermission(data);
+        
+        const counts = {};
+        visibleData.forEach(r => { const v = r[col] || 'Sem valor'; counts[v] = (counts[v]||0)+1; });
+        const labels = Object.keys(counts);
+        const values = Object.values(counts);
+        chart = new Chart(ctx, {
+            type: 'pie',
+            data: { labels, datasets: [{ data: values, backgroundColor: ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40'], hoverOffset: 4 }] },
+            options: {
+                responsive: true,
+                onClick: (e, els) => {
+                    if (els.length > 0) { chartFilter = labels[els[0].index]; } else { chartFilter = null; }
+                    applyFilters();
+                },
+                plugins: { legend: { position: 'right' }, datalabels: { formatter: (v, ctx) => ((v/ctx.dataset.data.reduce((a,b)=>a+b,0))*100).toFixed(1)+'%', color: '#fff', font: { weight: 'bold' } } }
+            },
+            plugins: [ChartDataLabels]
+        });
+    }
+
+    function loadCSV() {
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) return alert('Selecione um arquivo CSV');
+        Papa.parse(file, {
+            header: true,
+            complete: r => {
+                csvData = r.data.filter(x => Object.keys(x).length > 0);
+                headers = Object.keys(csvData[0] || {});
+                ensureColumns();
+                filteredData = [...csvData];
+                chartFilter = null;
+                saveToLocalStorage();
+                renderAll();
+                startMonitoring();
+                alert('CSV carregado com sucesso!');
+            }
+        });
+    }
+
+    function clearData() {
+        if (confirm('Limpar todos os dados?')) {
+            localStorage.removeItem('csvData');
+            localStorage.removeItem('csvHeaders');
+            csvData = []; headers = []; filteredData = []; chartFilter = null;
+            if (chart) chart.destroy();
+            document.getElementById('tableContainer').innerHTML = '';
+            document.getElementById('filterContainer').style.display = 'none';
+            document.getElementById('chartContainer').style.display = 'none';
+            document.getElementById('alertSection').style.display = 'none';
+            alert('Dados limpos!');
+        }
+    }
+
+    function downloadCSV() {
+        if (csvData.length === 0) return alert('Nenhum dado para baixar!');
+        const csv = Papa.unparse(csvData, { header: true });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'planilha_atualizada.csv';
+        link.click();
+    }
+
+    function saveSignedBlobToStorage(nfeDev, blob) {
+        const reader = new FileReader();
+        reader.onload = () => localStorage.setItem(`signedPDF_${nfeDev}`, reader.result);
+        reader.readAsDataURL(blob);
+    }
+
+    function getSignedBlobFromStorage(nfeDev) {
+        const data = localStorage.getItem(`signedPDF_${nfeDev}`);
+        return data ? fetch(data).then(r => r.blob()) : null;
+    }
+
+    function hasSignedPDF(nfeDev) { return !!localStorage.getItem(`signedPDF_${nfeDev}`); }
+
+    function openSignatureModal(idx) {
+        currentRowIndex = idx;
+        const row = csvData[idx];
+        document.getElementById('modalNfeDev').textContent = row[NFE_DEV_COLUMN];
+        document.getElementById('signatureModal').style.display = 'flex';
+        if (Object.keys(signaturePads).length === 0) {
+            setTimeout(() => {
+                ['sigCliente','sigConferente','sigMotorista'].forEach(id => {
+                    const canvas = document.getElementById(id);
+                    signaturePads[id] = new SignaturePad(canvas, { backgroundColor: 'rgb(255,255,255)', penColor: 'rgb(0,0,0)' });
+                });
+            }, 100);
+        } else {
+            Object.values(signaturePads).forEach(p => p.clear());
+        }
+    }
+
+    function clearSignature(id) { signaturePads[id].clear(); }
+
+    function closeSignatureModal() {
+        document.getElementById('signatureModal').style.display = 'none';
+        currentRowIndex = null;
+        lastGeneratedPDFBlob = null;
+        // Limpar campos de formulário
+        ['Cliente', 'Conferente', 'Motorista'].forEach(tipo => {
+            document.getElementById(`nome${tipo}`).value = '';
+            document.getElementById(`cpf${tipo}`).value = '';
+            document.getElementById(`cpf${tipo}`).classList.remove('invalid');
+            document.getElementById(`error${tipo}`).style.display = 'none';
+        });
+    }
+
+    function validarCPF(cpf) {
+        cpf = cpf.replace(/[^\d]/g, '');
+        if (cpf.length !== 11) return false;
+        if (/^(\d)\1{10}$/.test(cpf)) return false;
+        
+        let soma = 0;
+        let resto;
+        
+        for (let i = 1; i <= 9; i++) {
+            soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+        }
+        resto = (soma * 10) % 11;
+        if (resto === 10 || resto === 11) resto = 0;
+        if (resto !== parseInt(cpf.substring(9, 10))) return false;
+        
+        soma = 0;
+        for (let i = 1; i <= 10; i++) {
+            soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+        }
+        resto = (soma * 10) % 11;
+        if (resto === 10 || resto === 11) resto = 0;
+        if (resto !== parseInt(cpf.substring(10, 11))) return false;
+        
+        return true;
+    }
+
+    function formatarCPF(cpf) {
+        cpf = cpf.replace(/[^\d]/g, '');
+        return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+
+    function validarCamposAssinatura() {
+        let valido = true;
+        const tipos = ['Cliente', 'Conferente', 'Motorista'];
+        
+        tipos.forEach(tipo => {
+            const nome = document.getElementById(`nome${tipo}`).value.trim();
+            const cpf = document.getElementById(`cpf${tipo}`).value.trim();
+            const cpfInput = document.getElementById(`cpf${tipo}`);
+            const errorMsg = document.getElementById(`error${tipo}`);
+            const pad = signaturePads[`sig${tipo}`];
+            
+            // Validar apenas se houver assinatura
+            if (pad && !pad.isEmpty()) {
+                if (!nome) {
+                    alert(`Por favor, preencha o nome do ${tipo}`);
+                    valido = false;
+                    return;
+                }
+                
+                if (!cpf || !validarCPF(cpf)) {
+                    cpfInput.classList.add('invalid');
+                    errorMsg.style.display = 'block';
+                    valido = false;
+                } else {
+                    cpfInput.classList.remove('invalid');
+                    errorMsg.style.display = 'none';
+                }
+            }
+        });
+        
+        return valido;
+    }
+
+    // Adicionar listeners para validação em tempo real
+    document.addEventListener('DOMContentLoaded', function() {
+        ['Cliente', 'Conferente', 'Motorista'].forEach(tipo => {
+            const cpfInput = document.getElementById(`cpf${tipo}`);
+            if (cpfInput) {
+                cpfInput.addEventListener('input', function() {
+                    this.value = this.value.replace(/[^\d]/g, '');
+                });
+                
+                cpfInput.addEventListener('blur', function() {
+                    const errorMsg = document.getElementById(`error${tipo}`);
+                    if (this.value && !validarCPF(this.value)) {
+                        this.classList.add('invalid');
+                        errorMsg.style.display = 'block';
+                    } else {
+                        this.classList.remove('invalid');
+                        errorMsg.style.display = 'none';
+                    }
+                });
+            }
+        });
+    });
+
+    function saveSignedPDF(openAfter = true) {
+        if (currentRowIndex === null) return;
+        
+        // Validar campos antes de salvar
+        if (!validarCamposAssinatura()) {
+            alert("Por favor, corrija os erros nos campos de assinatura antes de salvar.");
+            return;
+        }
+        
+        const row = csvData[currentRowIndex];
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const margin = 15;
+        let y = 20;
+        doc.setFontSize(20); doc.setFont("helvetica","bold"); doc.text("ESPELHO DE DEVOLUÇÃO", pageWidth/2, y, {align:"center"}); y+=8;
+        doc.setFontSize(10); doc.text("Sistema Interno de Controle de Devoluções", pageWidth/2, y, {align:"center"}); y+=12;
+        doc.setFontSize(12); doc.text("DROGARIA SILVA ROCHA LTDA", margin, y);
+        doc.setFontSize(9); doc.text("CNPJ: 15.629.579/0002-04 • UF:BA • TEL.: (75) 3423-8631 • INSCRIÇÃO ESTADUAL:24867283", margin, y+=5);
+        doc.setDrawColor(74,144,226); doc.setLineWidth(1); doc.line(margin, y+=8, pageWidth-margin, y); y+=12;
+        doc.setFontSize(18); doc.setTextColor(233,30,99); doc.text(`Nota Fiscal Dev: ${row[NFE_DEV_COLUMN] || 'N/D'}`, pageWidth/2, y, {align:"center"}); y+=15;
+        doc.setTextColor(0); doc.setFontSize(10);
+        const leftData = [["Data/Hora:", row[TIMESTAMP_COLUMN] || '-'], ["Unidade de Negócio:", getValue(row,/loja|und.*negocio/i)||'-'], ["Motivo da Devolução:", getValue(row,/motivo/i)||'-'], ["Cliente:", getValue(row,/cliente|fornecedor/i)||'-'], ["CPF/CNPJ:", getValue(row,/cpf|cnpj/i)||'-']];
+        const rightData = [["Protocolo:", getValue(row,/protocolo|nota/i)||'-'], ["Conferente:", getValue(row,/conferente|responsavel/i)||'-'], ["Nota Fiscal de Orig.:", getValue(row,/nota fiscal de orig|Nfe- Origem/i)||'-'], ["Volumes:", row[VOLUMES_COLUMN]||'1'], ["Observação:", getValue(row,/obs|observação|observacoes|descricao/i)||'-']];
+        leftData.forEach(([l,v],i)=>{doc.setFont("helvetica","bold");doc.text(l,margin,y+i*7);doc.setFont("helvetica","normal");doc.text(String(v).substring(0,50),margin+45,y+i*7);});
+        rightData.forEach(([l,v],i)=>{doc.setFont("helvetica","bold");doc.text(l,margin+105,y+i*7);doc.setFont("helvetica","normal");doc.text(String(v).substring(0,40),margin+150,y+i*7);});
+        y+=60;
+        const sigIds = ['sigCliente','sigConferente','sigMotorista'];
+        const sigLabels = ["Cliente / Responsável","Conferente","Motorista / Entregador"];
+        const sigTipos = ['Cliente', 'Conferente', 'Motorista'];
+        let x = margin;
+        sigIds.forEach((id,i)=>{
+            const pad = signaturePads[id];
+            const nome = document.getElementById(`nome${sigTipos[i]}`).value.trim();
+            const cpf = document.getElementById(`cpf${sigTipos[i]}`).value.trim();
+            
+            if (pad && !pad.isEmpty()) {
+                doc.addImage(pad.toDataURL('image/png'),'PNG',x,y,55,30);
+            }
+            doc.setFontSize(10); doc.setFont("helvetica","bold"); doc.text(sigLabels[i],x,y+38);
+            doc.line(x,y+42,x+55,y+42);
+            doc.setFontSize(8); 
+            if (nome) {
+                doc.setFont("helvetica","normal");
+                doc.text(`Nome: ${nome.substring(0,20)}`,x,y+46);
+            }
+            if (cpf && validarCPF(cpf)) {
+                doc.text(`CPF: ${formatarCPF(cpf)}`,x,y+50);
+            }
+            doc.text("Data: "+new Date().toLocaleDateString('pt-BR'),x,y+54);
+            x+=65;
+        });
+        y+=75;
+        doc.setFontSize(9); doc.setTextColor(100);
+        doc.text(`Gerado com assinatura digital em ${getCurrentTimestamp()}`, pageWidth/2, y, {align:"center"});
+        const blob = doc.output('blob');
+        lastGeneratedPDFBlob = blob;
+        if (row[STATUS_COLUMN] !== "Coletado") { row[STATUS_COLUMN] = "Coletado"; saveToLocalStorage(); }
+        saveSignedBlobToStorage(row[NFE_DEV_COLUMN], blob);
+        if (openAfter) window.open(URL.createObjectURL(blob), '_blank');
+        doc.save(`${row[NFE_DEV_COLUMN]}_assinado.pdf`);
+        closeSignatureModal();
+        applyFilters();
+        generateChart(csvData);
+        updateOverdueAlertAndHighlight();
+        alert("Espelho salvo com sucesso e status alterado para COLETADO!");
+    }
+
+    function viewSignedPDF(nfeDev) {
+        getSignedBlobFromStorage(nfeDev).then(blob => {
+            if (blob) window.open(URL.createObjectURL(blob), '_blank');
+            else alert("PDF assinado não encontrado.");
+        });
+    }
+
+    function generateEtiquetaPDF(rowIndex) {
+        const row = csvData[rowIndex];
+        const totalVolumes = parseInt(row[VOLUMES_COLUMN]) || 1;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({orientation:'portrait',unit:'mm',format:[100,150]});
+        for (let vol=1; vol<=totalVolumes; vol++) {
+            if (vol>1) doc.addPage();
+            const protocolo = getValue(row,/protocolo|nota/i) || row[NFE_DEV_COLUMN] || "N/D";
+            doc.setFillColor(255,255,255); doc.rect(0,0,100,150,'F');
+            let y=8;
+            doc.setFontSize(22); doc.setFont("helvetica","bold"); doc.setTextColor(220,20,60); doc.text("DEVOLUÇÃO",50,y,{align:"center"}); y+=12;
+            doc.setFontSize(42); doc.setTextColor(0,0,150); doc.text(protocolo.length>20?protocolo.substring(0,18)+"...":protocolo,50,y,{align:"center"}); y+=18;
+            doc.setFontSize(36); doc.setTextColor(30,120,220); doc.text(`${vol}/${totalVolumes}`,50,y,{align:"center"}); y+=20;
+            const canvas = document.getElementById('barcodeCanvas');
+            JsBarcode(canvas, protocolo, {format:"CODE128",width:2,height:50,displayValue:true,fontSize:18,margin:10});
+            doc.addImage(canvas.toDataURL("image/png"),'PNG',5,y,90,25); y+=35;
+            doc.setFontSize(11); doc.setTextColor(0,0,0); doc.setFont("helvetica","normal");
+            const esquerda = [`Und. Negócio: ${getValue(row,/loja|und.*negocio/i)||'-'}`, `Fornecedor: ${getValue(row,/fornecedor|cliente/i)||'-'}`, `Responsável: ${getValue(row,/responsavel|motorista/i)||'-'}`, `Data: ${(row[TIMESTAMP_COLUMN]||'').split(' ')[0]||'-'}`];
+            const direita = [`NFe Origem: ${getValue(row,/nfe|nota/i)||'-'}`, `NFe-Dev: ${row[NFE_DEV_COLUMN]||'-'}`, `Motivo: ${getValue(row,/motivo/i)||'-'}`, `Volume: ${vol} de ${totalVolumes}`];
+            esquerda.forEach((t,i)=>doc.text(t.substring(0,45),5,y+i*8));
+            direita.forEach((t,i)=>doc.text(t.substring(0,45),52,y+i*8));
+            y+=38;
+            doc.setFontSize(9); doc.setTextColor(100);
+            doc.text(`Gerado em ${getCurrentTimestamp()}`,50,y+10,{align:"center"});
+        }
+        const suf = totalVolumes>1 ? `_etiquetas_${totalVolumes}vol.pdf` : `_etiqueta.pdf`;
+        doc.save(`${row[NFE_DEV_COLUMN]||'devolucao'}${suf}`);
+    }
+
+    function displayTable(data) {
+        const cont = document.getElementById('tableContainer');
+        if (data.length === 0) { cont.innerHTML = '<p>Nenhum dado encontrado.</p>'; return; }
+        // Regex para identificar coluna de observações
+        const obsRegex = /obs|observação|observacoes|descricao/i;
+        const cancelReasonColumn = "Motivo Cancelamento/Desistência";
+        // Filtrar colunas de volumes, observações e motivo de cancelamento dos cabeçalhos
+        const visibleHeaders = headers.filter(h => h !== VOLUMES_COLUMN && !obsRegex.test(h) && h !== cancelReasonColumn);
+        let html = '<table><thead><tr>' + visibleHeaders.map(h => `<th>${h}</th>`).join('') + '<th>Ações</th></tr></thead><tbody>';
+        data.forEach((row, i) => {
+            const idx = csvData.indexOf(row);
+            const overdue = isOverdue(row[TIMESTAMP_COLUMN]);
+            const volumes = parseInt(row[VOLUMES_COLUMN]) || 1;
+            const nfeDev = row[NFE_DEV_COLUMN];
+            const hasSigned = hasSignedPDF(nfeDev);
+            html += `<tr data-index="${idx}" ${overdue?'class="overdue"':''}>`;
+            headers.forEach(h => {
+                // Pular colunas de volumes, observações e motivo de cancelamento
+                if (h === VOLUMES_COLUMN || obsRegex.test(h) || h === cancelReasonColumn) return;
+                
+                const val = row[h] || '';
+                if (h === STATUS_COLUMN) {
+                    const safe = val.replace(/ /g,'-');
+                    html += `<td><div class="status-badge status-${safe}">${val||'Sem status'}</div></td>`;
+                } else {
+                    html += `<td>${escapeHtml(val)}</td>`;
+                }
+            });
+            html += `<td class="btn-group">`;
+            html += `<button class="botao-abrir-rodape">Detalhes</button>`;
+            html += `</td></tr>`;
+        });
+        html += '</tbody></table>';
+        cont.innerHTML = html;
+
+        // EVENTOS DO BOTÃO DETALHES
+        document.querySelectorAll('.botao-abrir-rodape').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tr = this.closest('tr');
+                const idx = tr.dataset.index;
+                openDetailFooter(parseInt(idx));
+            });
+        });
+
+        // Edição inline (mantida apenas para compatibilidade)
+        cont.querySelectorAll('td[contenteditable="true"]').forEach(td => {
+            td.addEventListener('blur', function() {
+                let v = this.textContent.trim();
+                const r = this.dataset.row;
+                const col = this.dataset.col;
+                if (col === VOLUMES_COLUMN) {
+                    v = parseInt(v) || 1;
+                    if (v < 1) v = 1; if (v > 99) v = 99;
+                    this.textContent = v;
+                }
+                if (csvData[r][col] !== v) {
+                    csvData[r][col] = v;
+                    saveToLocalStorage();
+                    applyFilters();
+                }
+            });
+            td.addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); td.blur(); } });
+        });
+    }
+
+
+
+    document.getElementById('addForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const obj = {};
+        let erro = false;
+        headers.forEach(h => {
+            if (h===TIMESTAMP_COLUMN) obj[h] = getCurrentTimestamp();
+            else if (h===NFE_DEV_COLUMN) obj[h] = generateNfeDev();
+            else if (h===STATUS_COLUMN) obj[h] = "Em Andamento";
+            else if (h===VOLUMES_COLUMN) obj[h] = "1";
+            else {
+                obj[h] = fd.get(h) || '';
+                if (!obj[h] && e.target.querySelector(`[name="${h}"]`).required) erro = true;
+            }
+        });
+        if (erro) { showNotification('error','Preencha todos os campos obrigatórios.'); return; }
+        csvData.push(obj);
+        logChange('created', obj);
+        saveToLocalStorage();
+        e.target.reset();
+        showNotification('success','Devolução registrada com sucesso!');
+        setTimeout(showDashboard, 2000);
+    });
+
+    document.getElementById('filterInput').addEventListener('input', applyFilters);
+    document.getElementById('downloadCSV').addEventListener('click', downloadCSV);
+
+    function loadApp() {
+        // Carregar usuários salvos
+        loadUsers();
+        
+        // Carregar histórico
+        loadHistory();
+        
+        // Mostrar menus de admin se for admin
+        if (currentUser && currentUser.type === 'admin') {
+            document.getElementById('adminMenuLink').style.display = 'block';
+            document.getElementById('historyMenuLink').style.display = 'block';
+            document.getElementById('reportsMenuLink').style.display = 'block';
+        }
+        
+        const saved = localStorage.getItem('csvData');
+        const savedH = localStorage.getItem('csvHeaders');
+        if (saved && savedH) {
+            csvData = JSON.parse(saved);
+            headers = JSON.parse(savedH);
+            ensureColumns();
+            filteredData = [...csvData];
+            renderAll();
+            startMonitoring();
+        }
+        showDashboard();
+    }
+
+    window.onload = function() {
+        // Inicializar Google API
+        gapiLoaded();
+        gisLoaded();
+        
+        initLogin();
+        if (checkAuth()) {
+            loadApp();
+        }
+    };
+</script>
+</body>
+</html>
