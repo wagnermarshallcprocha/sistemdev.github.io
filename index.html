@@ -862,7 +862,8 @@
 
             // Login bem-sucedido
             currentUser = {type: user.type, loja: user.loja, name: user.name};
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            // Não salvar no localStorage para evitar login automático
+            // localStorage.setItem('currentUser', JSON.stringify(currentUser));
             
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('userName').textContent = user.name;
@@ -890,23 +891,10 @@
     }
 
     function checkAuth() {
-        const saved = localStorage.getItem('currentUser');
-        if (saved) {
-            currentUser = JSON.parse(saved);
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('userName').textContent = currentUser.name;
-            document.getElementById('userRole').textContent = currentUser.type === 'admin' ? 'Acesso Total' : `Loja ${currentUser.loja}`;
-            document.getElementById('userInfo').style.display = 'block';
-            
-            // Mostrar menus de admin se for admin
-            if (currentUser.type === 'admin') {
-                document.getElementById('adminMenuLink').style.display = 'block';
-                document.getElementById('historyMenuLink').style.display = 'block';
-                document.getElementById('reportsMenuLink').style.display = 'block';
-            }
-            
-            return true;
-        }
+        // Removido login automático - usuário deve fazer login toda vez
+        // Limpar qualquer sessão anterior
+        localStorage.removeItem('currentUser');
+        currentUser = null;
         return false;
     }
 
