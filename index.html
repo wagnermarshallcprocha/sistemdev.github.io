@@ -517,6 +517,10 @@
                 <strong id="historyCount">0</strong> alterações registradas
                 <span id="historyFilterInfo" style="margin-left:1rem;font-size:0.9rem;color:#666;"></span>
             </p>
+            <p style="margin:0.5rem 0 0 0;font-size:0.85rem;color:#666;">
+                <i class="fas fa-cloud"></i> 
+                <span id="historySyncStatus">Sincronização com Google Sheets ativa</span>
+            </p>
         </div>
         <div id="historyStats" class="history-stats"></div>
         <div class="history-controls">
@@ -535,6 +539,9 @@
                 <option value="">Todos os Usuários</option>
             </select>
             <input type="date" id="historyDateFilter" class="history-filter" placeholder="Filtrar por data">
+            <button class="history-filter" onclick="syncHistoryNow()" style="background:#4285f4;color:white;border:none;cursor:pointer;font-weight:600;">
+                <i class="fas fa-sync-alt"></i> Sincronizar Agora
+            </button>
             <button class="btn-clear-history" onclick="clearHistory()">
                 <i class="fas fa-trash"></i> Limpar Histórico
             </button>
@@ -821,6 +828,7 @@
         CLIENT_ID: '980344147538-3toc58dfml513v6gsolg32p27f9aaj70.apps.googleusercontent.com',
         SPREADSHEET_ID: '1nse9nttIRDja80N7F93JXff2qRbViMcx2Dij8J_5WxI',
         SHEET_NAME: 'Devolucoes',
+        HISTORY_SHEET_NAME: 'Historico', // Nova aba para histórico de alterações
         DISCOVERY_DOCS: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
         SCOPES: 'https://www.googleapis.com/auth/spreadsheets'
     };
@@ -1360,6 +1368,11 @@
         }
         
         saveHistory();
+        
+        // Sincronizar com Google Sheets automaticamente
+        syncHistoryToSheets().catch(err => {
+            console.error('Erro ao sincronizar histórico:', err);
+        });
     }
 
     function showHistory() {
@@ -1598,12 +1611,54 @@
         `;
     }
 
+    async function syncHistoryNow() {
+        if (!gapiInited || !gisInited) {
+            showNotification('error', 'Google Sheets não está inicializado.');
+            document.getElementById('historySyncStatus').innerHTML = '<span style="color:#dc3545;">Google Sheets não inicializado</span>';
+            return;
+        }
+
+        if (gapi.client.getToken() === null) {
+            showNotification('error', 'Você precisa estar conectado ao Google Sheets.');
+            document.getElementById('historySyncStatus').innerHTML = '<span style="color:#dc3545;">Não conectado ao Google Sheets</span>';
+            return;
+        }
+
+        try {
+            showNotification('info', 'Sincronizando histórico...');
+            document.getElementById('historySyncStatus').innerHTML = '<span style="color:#2196f3;"><i class="fas fa-sync-alt fa-spin"></i> Sincronizando...</span>';
+            
+            // Buscar histórico remoto primeiro
+            await fetchHistoryFromSheets();
+            
+            // Depois enviar histórico local
+            await syncHistoryToSheets();
+            
+            // Atualizar visualização
+            renderHistory();
+            
+            const now = new Date().toLocaleTimeString('pt-BR');
+            document.getElementById('historySyncStatus').innerHTML = `<span style="color:#28a745;">Última sincronização: ${now}</span>`;
+            showNotification('success', 'Histórico sincronizado com sucesso!');
+        } catch (err) {
+            console.error('Erro ao sincronizar histórico:', err);
+            document.getElementById('historySyncStatus').innerHTML = '<span style="color:#dc3545;">Erro na sincronização</span>';
+            showNotification('error', 'Erro ao sincronizar histórico.');
+        }
+    }
+
     function clearHistory() {
         if (!confirm('Tem certeza que deseja limpar todo o histórico? Esta ação não pode ser desfeita.')) {
             return;
         }
         changeHistory = [];
         saveHistory();
+        
+        // Também limpar do Google Sheets
+        syncHistoryToSheets().catch(err => {
+            console.error('Erro ao limpar histórico remoto:', err);
+        });
+        
         renderHistory();
     }
 
@@ -2557,6 +2612,9 @@
                 // Salvar também no localStorage como backup
                 localStorage.setItem('csvData', JSON.stringify(csvData));
                 localStorage.setItem('csvHeaders', JSON.stringify(headers));
+                
+                // Buscar histórico também
+                await fetchHistoryFromSheets();
             } else {
                 updateSyncStatus('connected', 'Planilha vazia');
                 showNotification('info', 'Planilha do Google Sheets está vazia. Começando com dados locais.');
@@ -2602,6 +2660,128 @@
             console.log('Dados sincronizados com Google Sheets:', response.result.updatedRows, 'linhas');
         } catch (err) {
             console.error('Erro ao sincronizar com Google Sheets:', err);
+            // Não mostrar erro para não interromper o fluxo do usuário
+        }
+    }
+
+    // === SINCRONIZAÇÃO DE HISTÓRICO ===
+    async function fetchHistoryFromSheets() {
+        if (!gapiInited || !gisInited) {
+            console.log('Google Sheets não inicializado para histórico.');
+            return;
+        }
+
+        try {
+            if (gapi.client.getToken() === null) {
+                console.log('Token não disponível para buscar histórico.');
+                return;
+            }
+
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                range: `${GOOGLE_CONFIG.HISTORY_SHEET_NAME}!A:ZZ`,
+            });
+
+            const rows = response.result.values;
+            if (rows && rows.length > 1) {
+                // Primeira linha são os cabeçalhos
+                const historyHeaders = rows[0];
+                const historyRows = rows.slice(1);
+
+                // Converter para objetos
+                const remoteHistory = historyRows.map(row => {
+                    try {
+                        return {
+                            id: parseInt(row[0]) || Date.now(),
+                            timestamp: row[1] || '',
+                            action: row[2] || '',
+                            user: row[3] || '',
+                            userType: row[4] || '',
+                            userLoja: row[5] || null,
+                            data: row[6] ? JSON.parse(row[6]) : {},
+                            changes: row[7] ? JSON.parse(row[7]) : null
+                        };
+                    } catch (e) {
+                        console.error('Erro ao parsear linha de histórico:', e);
+                        return null;
+                    }
+                }).filter(item => item !== null);
+
+                // Mesclar com histórico local (evitar duplicatas por ID)
+                const localIds = new Set(changeHistory.map(h => h.id));
+                const newEntries = remoteHistory.filter(h => !localIds.has(h.id));
+                
+                if (newEntries.length > 0) {
+                    changeHistory = [...changeHistory, ...newEntries];
+                    // Ordenar por ID (timestamp) decrescente
+                    changeHistory.sort((a, b) => b.id - a.id);
+                    // Manter apenas últimas 500 entradas
+                    if (changeHistory.length > 500) {
+                        changeHistory = changeHistory.slice(0, 500);
+                    }
+                    saveHistory();
+                    console.log(`${newEntries.length} novas entradas de histórico sincronizadas.`);
+                }
+            }
+        } catch (err) {
+            // Se a aba não existe, será criada na primeira sincronização
+            if (err.result && err.result.error && err.result.error.code === 400) {
+                console.log('Aba de histórico ainda não existe. Será criada na primeira sincronização.');
+            } else {
+                console.error('Erro ao buscar histórico:', err);
+            }
+        }
+    }
+
+    async function syncHistoryToSheets() {
+        if (!gapiInited || !gisInited) {
+            console.log('Google Sheets não inicializado para histórico.');
+            return;
+        }
+
+        try {
+            if (gapi.client.getToken() === null) {
+                console.log('Token não disponível para sincronizar histórico.');
+                return;
+            }
+
+            // Preparar dados do histórico para o formato de planilha
+            const historyHeaders = ['ID', 'Timestamp', 'Action', 'User', 'UserType', 'UserLoja', 'Data', 'Changes'];
+            const historyRows = changeHistory.map(entry => [
+                entry.id,
+                entry.timestamp,
+                entry.action,
+                entry.user,
+                entry.userType,
+                entry.userLoja || '',
+                JSON.stringify(entry.data),
+                entry.changes ? JSON.stringify(entry.changes) : ''
+            ]);
+
+            const values = [historyHeaders, ...historyRows];
+
+            // Limpar a aba de histórico primeiro
+            try {
+                await gapi.client.sheets.spreadsheets.values.clear({
+                    spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                    range: `${GOOGLE_CONFIG.HISTORY_SHEET_NAME}!A:ZZ`,
+                });
+            } catch (clearErr) {
+                // Se falhar ao limpar, a aba pode não existir ainda
+                console.log('Aba de histórico será criada.');
+            }
+
+            // Atualizar com novos dados
+            const response = await gapi.client.sheets.spreadsheets.values.update({
+                spreadsheetId: GOOGLE_CONFIG.SPREADSHEET_ID,
+                range: `${GOOGLE_CONFIG.HISTORY_SHEET_NAME}!A1`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: values },
+            });
+
+            console.log('Histórico sincronizado com Google Sheets:', response.result.updatedRows, 'linhas');
+        } catch (err) {
+            console.error('Erro ao sincronizar histórico:', err);
             // Não mostrar erro para não interromper o fluxo do usuário
         }
     }
@@ -2745,6 +2925,9 @@
                 } else {
                     updateSyncStatus('connected', 'Sincronizado');
                 }
+                
+                // Buscar histórico também
+                await fetchHistoryFromSheets();
             }
         } catch (err) {
             console.error('Erro ao buscar dados silenciosamente:', err);
