@@ -189,7 +189,10 @@
         .login-field input:focus,.login-field select:focus{outline:none;border-color:var(--primary);}
         .login-btn{width:100%;padding:0.9rem;background:var(--primary);color:white;border:none;border-radius:8px;font-size:1.1rem;font-weight:600;cursor:pointer;transition:background 0.3s;}
         .login-btn:hover{background:var(--accent);}
+        .login-btn:disabled{background:#ccc;cursor:not-allowed;}
         .login-error{background:#ffebee;color:#c62828;padding:0.75rem;border-radius:8px;margin-bottom:1rem;text-align:center;display:none;}
+        .login-info{background:#e3f2fd;color:#1565c0;padding:0.75rem;border-radius:8px;margin-bottom:1rem;text-align:center;display:none;}
+        .login-info i{margin-right:0.5rem;}
         .user-info{background:#34495e;padding:0.75rem;border-radius:8px;margin-bottom:1rem;text-align:center;color:white;}
         .user-info strong{display:block;font-size:1.1rem;margin-bottom:0.25rem;}
         .user-info span{font-size:0.9rem;opacity:0.9;}
@@ -303,6 +306,9 @@
         <h1><i class="fas fa-box"></i> Sistema de Devolução</h1>
         <p>Faça login para acessar o sistema</p>
         <div id="loginError" class="login-error"></div>
+        <div id="loginInfo" class="login-info">
+            <i class="fab fa-google"></i> <span id="loginInfoText"></span>
+        </div>
         <form id="loginForm">
             <div class="login-field">
                 <label>Tipo de Acesso:</label>
@@ -322,8 +328,11 @@
                 <label>Senha:</label>
                 <input type="password" id="loginPassword" required placeholder="Digite a senha">
             </div>
-            <button type="submit" class="login-btn">Entrar</button>
+            <button type="submit" class="login-btn" id="loginBtn">Entrar</button>
         </form>
+        <p style="font-size:0.8rem;color:#999;margin-top:1rem;text-align:center;">
+            <i class="fas fa-info-circle"></i> A conexão com Google Sheets será solicitada após o login
+        </p>
     </div>
 </div>
 
@@ -421,7 +430,6 @@
                 <i class="fas fa-cog" id="syncConfigIcon"></i>
             </div>
         </div>
-        <button onclick="handleAuthClick()" class="sidebar-btn" style="background:#4285f4;"><i class="fab fa-google"></i> Conectar Google Sheets</button>
         <button onclick="importFromSheets()" class="sidebar-btn" style="margin-top:0.5rem;background:#0f9d58;"><i class="fas fa-cloud-download-alt"></i> Importar da Planilha</button>
         <button id="downloadCSV" class="sidebar-btn" style="margin-top:0.5rem;"><i class="fas fa-download"></i> Baixar CSV Atualizado</button>
         <button id="logoutBtn" class="sidebar-btn" style="margin-top:0.5rem;"><i class="fas fa-sign-out-alt"></i> Sair</button>
@@ -841,7 +849,7 @@
         });
 
         // Submit do login
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const type = document.getElementById('loginType').value;
             const password = document.getElementById('loginPassword').value;
@@ -860,21 +868,93 @@
                 return;
             }
 
-            // Login bem-sucedido
-            currentUser = {type: user.type, loja: user.loja, name: user.name};
-            // Não salvar no localStorage para evitar login automático
-            // localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            // Credenciais válidas - agora solicitar autenticação do Google
+            showLoginInfo('Conectando ao Google Sheets...');
+            disableLoginForm();
             
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('userName').textContent = user.name;
-            document.getElementById('userRole').textContent = user.type === 'admin' ? 'Acesso Total' : `Loja ${user.loja}`;
-            document.getElementById('userInfo').style.display = 'block';
-            
-            loadApp();
+            // Aguardar que API do Google esteja pronta
+            if (!gapiInited || !gisInited) {
+                showLoginError('Aguarde a inicialização do Google API...');
+                enableLoginForm();
+                return;
+            }
+
+            // Solicitar autenticação do Google Sheets
+            await requestGoogleAuth(user);
         });
 
         // Botão de logout
         document.getElementById('logoutBtn').addEventListener('click', logout);
+    }
+
+    async function requestGoogleAuth(user) {
+        tokenClient.callback = async (resp) => {
+            if (resp.error !== undefined) {
+                showLoginError('Falha na autenticação do Google Sheets. Tente novamente.');
+                enableLoginForm();
+                return;
+            }
+            
+            // Autenticação Google bem-sucedida
+            showLoginInfo('Carregando dados do Google Sheets...');
+            
+            try {
+                // Importar dados da planilha
+                await fetchSheetData();
+                
+                // Login completamente bem-sucedido
+                currentUser = {type: user.type, loja: user.loja, name: user.name};
+                
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('userName').textContent = user.name;
+                document.getElementById('userRole').textContent = user.type === 'admin' ? 'Acesso Total' : `Loja ${user.loja}`;
+                document.getElementById('userInfo').style.display = 'block';
+                
+                // Iniciar sincronização automática
+                startAutoSync();
+                
+                loadApp();
+            } catch (err) {
+                console.error('Erro ao carregar dados:', err);
+                showLoginError('Erro ao carregar dados do Google Sheets. Tente novamente.');
+                enableLoginForm();
+            }
+        };
+
+        // Solicitar token de acesso
+        if (gapi.client.getToken() === null) {
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        } else {
+            tokenClient.requestAccessToken({prompt: ''});
+        }
+    }
+
+    function disableLoginForm() {
+        document.getElementById('loginBtn').disabled = true;
+        document.getElementById('loginBtn').textContent = 'Aguarde...';
+        document.getElementById('loginType').disabled = true;
+        document.getElementById('loginPassword').disabled = true;
+        document.getElementById('lojaNumber').disabled = true;
+    }
+
+    function enableLoginForm() {
+        document.getElementById('loginBtn').disabled = false;
+        document.getElementById('loginBtn').textContent = 'Entrar';
+        document.getElementById('loginType').disabled = false;
+        document.getElementById('loginPassword').disabled = false;
+        document.getElementById('lojaNumber').disabled = false;
+        hideLoginInfo();
+    }
+
+    function showLoginInfo(msg) {
+        const infoDiv = document.getElementById('loginInfo');
+        document.getElementById('loginInfoText').textContent = msg;
+        infoDiv.style.display = 'block';
+        document.getElementById('loginError').style.display = 'none';
+    }
+
+    function hideLoginInfo() {
+        document.getElementById('loginInfo').style.display = 'none';
     }
 
     function showLoginError(msg) {
@@ -2282,9 +2362,9 @@
     }
 
     function maybeEnableButtons() {
+        // Google API inicializado - pronto para autenticação durante o login
         if (gapiInited && gisInited) {
-            // Tenta carregar dados ao inicializar
-            loadFromGoogleSheets();
+            console.log('Google API pronta para autenticação');
         }
     }
 
@@ -3099,3 +3179,4 @@
 </script>
 </body>
 </html>
+
