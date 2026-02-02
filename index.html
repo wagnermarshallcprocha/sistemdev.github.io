@@ -216,6 +216,13 @@
         .success-msg{background:#d4edda;color:#155724;padding:0.5rem;border-radius:4px;margin-top:0.5rem;text-align:center;font-size:0.85rem;display:none;}
         
         /* HISTÓRICO DE ALTERAÇÕES */
+        .history-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem;}
+        .history-stat-card{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:1rem;border-radius:8px;text-align:center;}
+        .history-stat-card.admin{background:linear-gradient(135deg,#dc3545 0%,#c82333 100%);}
+        .history-stat-card.loja{background:linear-gradient(135deg,#28a745 0%,#218838 100%);}
+        .history-stat-card h4{margin:0;font-size:0.85rem;opacity:0.9;}
+        .history-stat-card .value{font-size:2rem;font-weight:bold;margin:0.5rem 0;}
+        .history-stat-card p{margin:0;font-size:0.8rem;opacity:0.8;}
         .history-controls{display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center;}
         .history-filter{padding:0.6rem;border:2px solid #ddd;border-radius:6px;font-size:0.95rem;min-width:150px;}
         .btn-clear-history{padding:0.6rem 1.2rem;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;transition:background 0.3s;}
@@ -233,6 +240,9 @@
         .history-timestamp{font-size:0.85rem;color:#666;font-style:italic;}
         .history-user{display:inline-flex;align-items:center;gap:0.5rem;background:#f8f9fa;padding:0.3rem 0.8rem;border-radius:15px;font-size:0.85rem;color:#495057;}
         .history-user i{color:var(--primary);}
+        .history-user-badge{display:inline-block;padding:0.2rem 0.6rem;border-radius:10px;font-size:0.75rem;font-weight:600;margin-left:0.5rem;}
+        .history-user-badge.admin{background:#dc3545;color:white;}
+        .history-user-badge.loja{background:#28a745;color:white;}
         .history-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.8rem;font-size:0.9rem;}
         .history-field{background:#f8f9fa;padding:0.6rem;border-radius:6px;}
         .history-field strong{display:block;color:#666;font-size:0.8rem;margin-bottom:0.3rem;}
@@ -501,12 +511,25 @@
         <a onclick="showDashboard()" class="back-btn"><i class="fas fa-arrow-left"></i> Voltar ao Dashboard</a>
     </header>
     <div class="form-panel">
+        <div style="background:#e8f5e9;padding:1rem;border-radius:8px;margin-bottom:1.5rem;text-align:center;">
+            <p style="margin:0;font-size:1rem;color:#2e7d32;">
+                <i class="fas fa-chart-line"></i> 
+                <strong id="historyCount">0</strong> alterações registradas
+                <span id="historyFilterInfo" style="margin-left:1rem;font-size:0.9rem;color:#666;"></span>
+            </p>
+        </div>
+        <div id="historyStats" class="history-stats"></div>
         <div class="history-controls">
             <select id="historyActionFilter" class="history-filter">
                 <option value="">Todas as Ações</option>
                 <option value="created">Criações</option>
                 <option value="updated">Atualizações</option>
                 <option value="deleted">Exclusões</option>
+            </select>
+            <select id="historyUserTypeFilter" class="history-filter">
+                <option value="">Todos os Tipos</option>
+                <option value="admin">Administradores</option>
+                <option value="loja">Lojas</option>
             </select>
             <select id="historyUserFilter" class="history-filter">
                 <option value="">Todos os Usuários</option>
@@ -1313,6 +1336,7 @@
             action: action, // 'created', 'updated', 'deleted'
             user: currentUser.name,
             userType: currentUser.type,
+            userLoja: currentUser.loja || null, // Adicionar loja se for usuário de loja
             data: {...data}
         };
 
@@ -1353,13 +1377,82 @@
     }
 
     function renderHistory() {
+        renderHistoryStats();
         populateHistoryFilters();
         applyHistoryFilters();
     }
 
+    function renderHistoryStats() {
+        const statsContainer = document.getElementById('historyStats');
+        
+        // Calcular estatísticas
+        const totalChanges = changeHistory.length;
+        const adminChanges = changeHistory.filter(h => h.userType === 'admin').length;
+        const lojaChanges = changeHistory.filter(h => h.userType === 'loja').length;
+        
+        // Contar alterações por usuário
+        const userCounts = {};
+        changeHistory.forEach(h => {
+            userCounts[h.user] = (userCounts[h.user] || 0) + 1;
+        });
+        
+        // Ordenar usuários por número de alterações
+        const topUsers = Object.entries(userCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3);
+        
+        // Contar por tipo de ação
+        const actionCounts = {
+            created: changeHistory.filter(h => h.action === 'created').length,
+            updated: changeHistory.filter(h => h.action === 'updated').length,
+            deleted: changeHistory.filter(h => h.action === 'deleted').length
+        };
+        
+        // Renderizar cards de estatísticas
+        let html = '';
+        
+        // Card de admins
+        html += `
+            <div class="history-stat-card admin">
+                <h4><i class="fas fa-user-shield"></i> Alterações por Admin</h4>
+                <div class="value">${adminChanges}</div>
+                <p>${((adminChanges/totalChanges)*100).toFixed(1)}% do total</p>
+            </div>
+        `;
+        
+        // Card de lojas
+        html += `
+            <div class="history-stat-card loja">
+                <h4><i class="fas fa-store"></i> Alterações por Lojas</h4>
+                <div class="value">${lojaChanges}</div>
+                <p>${((lojaChanges/totalChanges)*100).toFixed(1)}% do total</p>
+            </div>
+        `;
+        
+        // Card de criações
+        html += `
+            <div class="history-stat-card" style="background:linear-gradient(135deg,#4caf50 0%,#388e3c 100%);">
+                <h4><i class="fas fa-plus-circle"></i> Criações</h4>
+                <div class="value">${actionCounts.created}</div>
+                <p>${((actionCounts.created/totalChanges)*100).toFixed(1)}% do total</p>
+            </div>
+        `;
+        
+        // Card de atualizações
+        html += `
+            <div class="history-stat-card" style="background:linear-gradient(135deg,#2196f3 0%,#1976d2 100%);">
+                <h4><i class="fas fa-edit"></i> Atualizações</h4>
+                <div class="value">${actionCounts.updated}</div>
+                <p>${((actionCounts.updated/totalChanges)*100).toFixed(1)}% do total</p>
+            </div>
+        `;
+        
+        statsContainer.innerHTML = html;
+    }
+
     function populateHistoryFilters() {
         const userFilter = document.getElementById('historyUserFilter');
-        const users = [...new Set(changeHistory.map(h => h.user))];
+        const users = [...new Set(changeHistory.map(h => h.user))].sort();
         
         userFilter.innerHTML = '<option value="">Todos os Usuários</option>';
         users.forEach(user => {
@@ -1368,12 +1461,14 @@
 
         // Adicionar eventos de filtro
         document.getElementById('historyActionFilter').onchange = applyHistoryFilters;
+        document.getElementById('historyUserTypeFilter').onchange = applyHistoryFilters;
         document.getElementById('historyUserFilter').onchange = applyHistoryFilters;
         document.getElementById('historyDateFilter').onchange = applyHistoryFilters;
     }
 
     function applyHistoryFilters() {
         const actionFilter = document.getElementById('historyActionFilter').value;
+        const userTypeFilter = document.getElementById('historyUserTypeFilter').value;
         const userFilter = document.getElementById('historyUserFilter').value;
         const dateFilter = document.getElementById('historyDateFilter').value;
 
@@ -1381,6 +1476,10 @@
 
         if (actionFilter) {
             filtered = filtered.filter(h => h.action === actionFilter);
+        }
+
+        if (userTypeFilter) {
+            filtered = filtered.filter(h => h.userType === userTypeFilter);
         }
 
         if (userFilter) {
@@ -1401,6 +1500,17 @@
 
     function renderHistoryItems(items) {
         const container = document.getElementById('historyContainer');
+        
+        // Atualizar contador
+        document.getElementById('historyCount').textContent = items.length;
+        
+        // Atualizar informação de filtro
+        const totalHistory = changeHistory.length;
+        if (items.length < totalHistory) {
+            document.getElementById('historyFilterInfo').textContent = `(${totalHistory} no total)`;
+        } else {
+            document.getElementById('historyFilterInfo').textContent = '';
+        }
         
         if (items.length === 0) {
             container.innerHTML = `
@@ -1428,6 +1538,11 @@
 
         const actionClass = item.action;
         const actionLabel = actionLabels[item.action] || item.action;
+
+        // Determinar badge e ícone do usuário
+        const userTypeLabel = item.userType === 'admin' ? 'Admin' : (item.userLoja ? `Loja ${item.userLoja}` : 'Loja');
+        const userIcon = item.userType === 'admin' ? 'fa-user-shield' : 'fa-store';
+        const badgeClass = item.userType === 'admin' ? 'admin' : 'loja';
 
         let detailsHtml = '';
 
@@ -1471,8 +1586,9 @@
                     <div>
                         <span class="history-action ${actionClass}">${actionLabel}</span>
                         <span class="history-user">
-                            <i class="fas fa-user"></i>
+                            <i class="fas ${userIcon}"></i>
                             ${item.user}
+                            <span class="history-user-badge ${badgeClass}">${userTypeLabel}</span>
                         </span>
                     </div>
                     <span class="history-timestamp">${item.timestamp}</span>
